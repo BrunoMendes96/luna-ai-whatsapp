@@ -78,7 +78,7 @@ function Dashboard({ logout, user }) {
   const [conversations, setConversations] = useState([]);
 
   async function loadConversations() {
-    const response = await fetch("http://127.0.0.1:3000/api/conversations");
+    const response = await fetch("https://luna-ai-whatsapp-production.up.railway.app/api/conversations");
     const data = await response.json();
     setConversations(data);
   }
