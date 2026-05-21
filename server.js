@@ -254,8 +254,6 @@ async function sendWhatsAppMessage(to, text) {
   }
 }
 
-    console.log("Mensagem enviada:", response.data);
-
 async function generateSpeechAudio(text) {
   const audioPath = path.join(process.cwd(), `reply-${Date.now()}.mp3`);
 
