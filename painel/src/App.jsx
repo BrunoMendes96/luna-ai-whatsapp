@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { supabase } from "./supabaseClient.js";
-
 function App() {
   const [session, setSession] = useState(null);
   const [email, setEmail] = useState("");
