@@ -316,7 +316,7 @@ function Dashboard({ session, logout }) {
             </div>
           </div>
 
-          <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-5 h-[calc(100vh-180px)] flex flex-col">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-5 h-[88vh] flex flex-col">
             {selectedConversation ? (
               <>
                 <div className="mb-5">
@@ -328,7 +328,7 @@ function Dashboard({ session, logout }) {
                 </div>
 
                 <input
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-2xl p-3 mb-3 outline-none"
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl p-2 mb-2 outline-none text-sm"
                   placeholder="Nome do cliente"
                   defaultValue={selectedConversation.customer_name || ""}
                   onBlur={(e) =>
@@ -341,7 +341,7 @@ function Dashboard({ session, logout }) {
                 />
 
                 <textarea
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-2xl p-3 mb-3 outline-none h-24"
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl p-2 mb-2 outline-none h-16 text-sm"
                   placeholder="Observações internas"
                   defaultValue={selectedConversation.notes || ""}
                   onBlur={(e) =>
@@ -354,7 +354,7 @@ function Dashboard({ session, logout }) {
                 />
 
                 <select
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-2xl p-3 mb-4 outline-none"
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl p-2 mb-3 outline-none text-sm"
                   value={selectedConversation.status || "Novo Lead"}
                   onChange={(e) =>
                     updateStatus(selectedConversation.phone, e.target.value)
@@ -371,21 +371,21 @@ function Dashboard({ session, logout }) {
                   <div className="grid grid-cols-2 gap-3 mb-4">
                     <button
                       onClick={() => confirmAppointment(selectedConversation)}
-                      className="bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded-2xl p-3 font-bold"
+                      className="bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded-xl p-2 text-sm font-bold"
                     >
                       Confirmar
                     </button>
 
                     <button
                       onClick={() => cancelAppointment(selectedConversation)}
-                      className="bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-2xl p-3 font-bold"
+                      className="bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-xl p-2 text-sm font-bold"
                     >
                       Cancelar
                     </button>
                   </div>
                 )}
 
-                <div className="flex-1 overflow-y-auto pr-2 space-y-3 border-t border-zinc-800 pt-4">
+                <div className="flex-1 overflow-y-auto pr-2 space-y-3 border-t border-zinc-800 pt-3 min-h-0">
                   {[...(selectedConversation.history || [])]
                     .reverse()
                     .map((msg, index) => (
@@ -412,7 +412,7 @@ function Dashboard({ session, logout }) {
             )}
           </div>
 
-          <aside className="bg-zinc-900 border border-zinc-800 rounded-3xl p-5 h-[calc(100vh-180px)] overflow-y-auto">
+          <aside className="bg-zinc-900 border border-zinc-800 rounded-3xl p-5 h-[88vh] overflow-y-auto">
             <h2 className="text-2xl font-bold mb-5">
               Agendamentos Confirmados
             </h2>
