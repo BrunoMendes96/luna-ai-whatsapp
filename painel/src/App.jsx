@@ -264,7 +264,7 @@ function Dashboard({ session, logout }) {
           <Metric title="Fechados" value={totals.fechado} />
         </section>
 
-        <section className="grid grid-cols-1 xl:grid-cols-[1.5fr_1.2fr_0.9fr] gap-6">
+        <section className="grid grid-cols-1 xl:grid-cols-[360px_minmax(760px,1fr)_360px] gap-6">
           <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-5">
             <div className="flex items-center justify-between gap-4 mb-5">
               <h2 className="text-2xl font-bold">Funil</h2>
@@ -277,7 +277,7 @@ function Dashboard({ session, logout }) {
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-4 gap-4">
+            <div className="space-y-4">
               {STATUS_OPTIONS.filter((status) => status !== "Fechado").map(
                 (status) => (
                   <KanbanColumn
