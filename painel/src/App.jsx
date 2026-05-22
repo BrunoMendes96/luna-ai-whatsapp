@@ -1,7 +1,13 @@
 import { useEffect, useState } from "react";
 
+const API_URL = "https://luna-ai-whatsapp-production.up.railway.app";
+
 function App() {
-  const [session, setSession] = useState(null);
+  const [session, setSession] = useState(() => {
+    const saved = localStorage.getItem("luna_admin");
+    return saved ? JSON.parse(saved) : null;
+  });
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
@@ -9,11 +15,9 @@ function App() {
     e.preventDefault();
 
     if (email === "bruno.coop32@icloud.com" && password === "jaftYw-nirke9-dibsak") {
-      setSession({
-        user: {
-          email: "bruno.coop32@icloud.com"
-        }
-      });
+      const adminSession = { user: { email: "bruno.coop32@icloud.com" } };
+      localStorage.setItem("luna_admin", JSON.stringify(adminSession));
+      setSession(adminSession);
       return;
     }
 
@@ -21,37 +25,22 @@ function App() {
   }
 
   function logout() {
+    localStorage.removeItem("luna_admin");
     setSession(null);
   }
 
   if (!session) {
     return (
       <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center p-6">
-        <form
-          onSubmit={login}
-          className="bg-zinc-900 border border-zinc-800 rounded-3xl p-8 w-full max-w-md"
-        >
+        <form onSubmit={login} className="bg-zinc-900 border border-zinc-800 rounded-3xl p-8 w-full max-w-md">
           <h1 className="text-3xl font-bold">Luna AI</h1>
           <p className="text-zinc-400 mt-2 mb-8">Login do painel admin</p>
 
-          <input
-            className="w-full bg-zinc-800 rounded-xl p-4 mb-4 outline-none"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
+          <input className="w-full bg-zinc-800 rounded-xl p-4 mb-4 outline-none" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
 
-          <input
-            className="w-full bg-zinc-800 rounded-xl p-4 mb-6 outline-none"
-            placeholder="Senha"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
+          <input className="w-full bg-zinc-800 rounded-xl p-4 mb-6 outline-none" placeholder="Senha" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
 
-          <button className="w-full bg-white text-black rounded-xl p-4 font-bold">
-            Entrar
-          </button>
+          <button className="w-full bg-white text-black rounded-xl p-4 font-bold">Entrar</button>
         </form>
       </div>
     );
@@ -62,19 +51,25 @@ function App() {
 
 function Dashboard({ logout, user }) {
   const [conversations, setConversations] = useState([]);
+  const [debug, setDebug] = useState("Carregando...");
 
   async function loadConversations() {
-    const response = await fetch(
-      "https://luna-ai-whatsapp-production.up.railway.app/api/conversations"
-    );
+    try {
+      const response = await fetch(`${API_URL}/api/conversations`);
+      const data = await response.json();
 
-    const data = await response.json();
-    setConversations(data);
+      setConversations(data);
+      setDebug(`OK - ${data.length} conversa(s) carregada(s)`);
+    } catch (error) {
+      setDebug("ERRO: " + error.message);
+    }
   }
 
   useEffect(() => {
     loadConversations();
+
     const interval = setInterval(loadConversations, 3000);
+
     return () => clearInterval(interval);
   }, []);
 
@@ -85,12 +80,10 @@ function Dashboard({ logout, user }) {
           <div>
             <h1 className="text-5xl font-bold">Luna AI Dashboard</h1>
             <p className="text-zinc-400 mt-3">Logado como {user.email}</p>
+            <p className="text-green-400 mt-2">{debug}</p>
           </div>
 
-          <button
-            onClick={logout}
-            className="bg-red-500/20 text-red-400 px-5 py-3 rounded-2xl"
-          >
+          <button onClick={logout} className="bg-red-500/20 text-red-400 px-5 py-3 rounded-2xl">
             Sair
           </button>
         </div>
@@ -104,19 +97,16 @@ function Dashboard({ logout, user }) {
         <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6">
           <h2 className="text-3xl font-bold mb-8">Conversas Reais</h2>
 
+          {conversations.length === 0 && (
+            <p className="text-zinc-400">Nenhuma conversa encontrada ainda.</p>
+          )}
+
           {conversations.map((conversation, index) => (
             <div key={index} className="bg-zinc-800 rounded-2xl p-6 mb-6">
-              <p className="text-sm text-zinc-400 mb-4">
-                Cliente: {conversation.phone}
-              </p>
+              <p className="text-sm text-zinc-400 mb-4">Cliente: {conversation.phone}</p>
 
               {conversation.history.map((msg, idx) => (
-                <div
-                  key={idx}
-                  className={`p-4 rounded-xl mb-3 ${
-                    msg.role === "user" ? "bg-zinc-700" : "bg-green-500/20"
-                  }`}
-                >
+                <div key={idx} className={`p-4 rounded-xl mb-3 ${msg.role === "user" ? "bg-zinc-700" : "bg-green-500/20"}`}>
                   <p className="text-xs text-zinc-400 mb-1">
                     {msg.role === "user" ? "Cliente" : "IA"}
                   </p>
