@@ -6,7 +6,19 @@ function App() {
   const [password, setPassword] = useState("");
 
   async function login(e) {
-    e.preventDefault();
+  e.preventDefault();
+
+  if (email === "bruno.coop32@icloud.com" && password === "jaftYw-nirke9-dibsak") {
+    setSession({
+      user: {
+        email: "bruno.coop32@icloud.com"
+      }
+    });
+    return;
+  }
+
+  alert("Email ou senha incorretos");
+}
 
     const { error } = await supabase.auth.signInWithPassword({
       email,
@@ -78,7 +90,7 @@ function Dashboard({ logout, user }) {
   const [conversations, setConversations] = useState([]);
 
   async function loadConversations() {
-    const response = await fetch("https://luna-ai-whatsapp-production.up.railway.app/api/conversations")
+    const response = await fetch("https://luna-ai-whatsapp-production.up.railway.app/api/conversations");
     const data = await response.json();
     setConversations(data);
   }
