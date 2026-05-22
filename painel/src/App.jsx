@@ -273,7 +273,9 @@ Vi que você entrou em contato conosco e queria saber se ainda deseja agendar ou
               <h2 className="text-xl font-bold mb-5">{status}</h2>
 
               {conversations
-                .filter((conversation) => (conversation.status || "Novo Lead") === status)
+                {[...conversations]
+  .reverse()
+  .filter((conversation) => (conversation.status || "Novo Lead") === status)
                 .map((conversation, index) => (
                   <div key={index} className="bg-zinc-800 rounded-2xl p-5 mb-5">
                     <p className="text-sm text-zinc-400 mb-2">Cliente</p>
@@ -329,8 +331,10 @@ Vi que você entrou em contato conosco e queria saber se ainda deseja agendar ou
 )}
                     </button>
 
-                    <div className="space-y-3 max-h-80 overflow-auto">
-                      {conversation.history.map((msg, idx) => (
+                    <div className="space-y-3 max-h-80 overflow-auto flex flex-col-reverse">
+                      {[...conversation.history]
+  .reverse()
+  .map((msg, idx) => (
                         <div key={idx} className={`p-3 rounded-xl ${msg.role === "user" ? "bg-zinc-700" : "bg-green-500/20"}`}>
                           <p className="text-xs text-zinc-400 mb-1">
                             {msg.role === "user" ? "Cliente" : "IA"}
