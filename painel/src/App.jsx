@@ -42,8 +42,17 @@ function App() {
     setSession(null);
   }
 
-  async function loadConversations() {
-    async function loadAppointments() {
+    async function loadConversations() {
+  try {
+    const response = await fetch(`${API_URL}/api/conversations`);
+    const data = await response.json();
+    setConversations(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+async function loadAppointments() {
   try {
     const response = await fetch(`${API_URL}/api/appointments`);
     const data = await response.json();
@@ -51,14 +60,7 @@ function App() {
   } catch (error) {
     console.error(error);
   }
-     }try {
-      const response = await fetch(`${API_URL}/api/conversations`);
-      const data = await response.json();
-      setConversations(data);
-    } catch (error) {
-      console.error(error);
-    }
-  }
+}
 
   async function updateStatus(phone, status) {
     await fetch(`${API_URL}/api/conversations/status`, {
