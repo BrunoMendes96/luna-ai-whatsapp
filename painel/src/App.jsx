@@ -230,7 +230,7 @@ function App() {
   </button>
 )}
 
-<div className="space-y-3 max-h-96 overflow-auto">
+<div className="space-y-3 h-[500px] overflow-auto pr-2">
                       {[...conversation.history]
                         .reverse()
                         .map((msg, idx) => (
