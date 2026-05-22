@@ -51,17 +51,23 @@ app.get("/api/conversations", async (req, res) => {
 
   data.forEach((item) => {
     if (!grouped[item.phone]) {
-      grouped[item.phone].status = item.status || grouped[item.phone].status || "Novo Lead";
-grouped[item.phone].customer_name = item.customer_name || grouped[item.phone].customer_name || "";
-grouped[item.phone].notes = item.notes || grouped[item.phone].notes || "";
       grouped[item.phone] = {
-  phone: item.phone,
-  status: item.status || "Novo Lead",
-  customer_name: item.customer_name || "",
-  notes: item.notes || "",
-  history: []
-};
+        phone: item.phone,
+        status: item.status || "Novo Lead",
+        customer_name: item.customer_name || "",
+        notes: item.notes || "",
+        history: []
+      };
     }
+
+    grouped[item.phone].status =
+      item.status || grouped[item.phone].status || "Novo Lead";
+
+    grouped[item.phone].customer_name =
+      item.customer_name || grouped[item.phone].customer_name || "";
+
+    grouped[item.phone].notes =
+      item.notes || grouped[item.phone].notes || "";
 
     grouped[item.phone].history.push({
       role: item.role,
@@ -71,37 +77,6 @@ grouped[item.phone].notes = item.notes || grouped[item.phone].notes || "";
 
   res.json(Object.values(grouped));
 });
-
-app.get("/webhook", (req, res) => {
-  const mode = req.query["hub.mode"];
-  const token = req.query["hub.verify_token"];
-  const challenge = req.query["hub.challenge"];
-
-  if (mode === "subscribe" && token === process.env.VERIFY_TOKEN) {
-    return res.status(200).send(challenge);
-  }
-
-  return res.sendStatus(403);
-});
-
-app.post("/webhook", async (req, res) => {
-  try {
-    const message = req.body.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
-
-    console.log("Webhook recebido");
-
-    if (!message) {
-      return res.sendStatus(200);
-    }
-
-    const messageId = message.id;
-    const from = message.from;
-
-    if (processedMessages.has(messageId)) {
-      console.log("Mensagem duplicada ignorada:", messageId);
-      return res.sendStatus(200);
-    }
-
     processedMessages.add(messageId);
 
     let userText = "";
