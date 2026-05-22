@@ -19,6 +19,7 @@ function App() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [conversations, setConversations] = useState([]);
+  const [appointments, setAppointments] = useState([]);
 
   function login(e) {
     e.preventDefault();
@@ -42,7 +43,15 @@ function App() {
   }
 
   async function loadConversations() {
-    try {
+    async function loadAppointments() {
+  try {
+    const response = await fetch(`${API_URL}/api/appointments`);
+    const data = await response.json();
+    setAppointments(data);
+  } catch (error) {
+    console.error(error);
+  }
+     }try {
       const response = await fetch(`${API_URL}/api/conversations`);
       const data = await response.json();
       setConversations(data);
@@ -117,6 +126,7 @@ function App() {
     if (!session) return;
 
     loadConversations();
+    loadAppointments();
 
     const interval = setInterval(loadConversations, 3000);
 
@@ -303,6 +313,50 @@ function App() {
                 ))}
             </div>
           ))}
+          <div className="mt-16">
+  <h2 className="text-3xl font-bold mb-6">
+    Agendamentos Confirmados
+  </h2>
+
+  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+    {appointments.map((appointment, index) => (
+      <div
+        key={index}
+        className="bg-zinc-900 border border-zinc-800 rounded-3xl p-5"
+      >
+        <p className="text-zinc-400 text-sm mb-2">
+          Cliente
+        </p>
+
+        <p className="font-bold text-xl mb-4">
+          {appointment.customer_name || "Cliente"}
+        </p>
+
+        <p className="text-zinc-400 text-sm mb-2">
+          Serviço
+        </p>
+
+        <p className="mb-4">
+          {appointment.service}
+        </p>
+
+        <p className="text-zinc-400 text-sm mb-2">
+          Data/Hora
+        </p>
+
+        <p className="mb-4">
+          {appointment.appointment_date}
+        </p>
+
+        <p className="text-zinc-400 text-sm mb-2">
+          Telefone
+        </p>
+
+        <p>{appointment.phone}</p>
+      </div>
+    ))}
+  </div>
+</div>
         </div>
       </div>
     </div>
