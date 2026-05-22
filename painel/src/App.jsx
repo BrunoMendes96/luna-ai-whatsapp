@@ -17,12 +17,12 @@ function login(e) {
   const typedPassword = password.trim();
 
   if (
-    typedEmail === "bruno32@icloud.com" &&
+    typedEmail === "bruno.coop32@icloud.com" &&
     typedPassword === "jaftYw-nirke9-dibsab"
   ) {
     const adminSession = {
       user: {
-        email: "bruno32@icloud.com"
+        email: "bruno.coop32@icloud.com"
       }
     };
 
