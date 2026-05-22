@@ -54,6 +54,7 @@ function App() {
 
   async function updateStatus(phone, status) {
     async function updateDetails(phone, customer_name, notes) {
+      
   await fetch(`${API_URL}/api/conversations/details`, {
     method: "POST",
     headers: {
@@ -207,20 +208,29 @@ function App() {
 />
 
                     <select
-                      className="w-full bg-zinc-900 rounded-xl p-3 mb-4"
-                      value={conversation.status || "Novo Lead"}
-                      onChange={(e) =>
-                        updateStatus(conversation.phone, e.target.value)
-                      }
-                    >
-                      {STATUS_OPTIONS.map((item) => (
-                        <option key={item} value={item}>
-                          {item}
-                        </option>
-                      ))}
-                    </select>
+  className="w-full bg-zinc-900 rounded-xl p-3 mb-4"
+  value={conversation.status || "Novo Lead"}
+  onChange={(e) =>
+    updateStatus(conversation.phone, e.target.value)
+  }
+>
+  {STATUS_OPTIONS.map((item) => (
+    <option key={item} value={item}>
+      {item}
+    </option>
+  ))}
+</select>
 
-                    <div className="space-y-3 max-h-96 overflow-auto">
+{(conversation.status || "").includes("Aguardando") && (
+  <button
+    onClick={() => confirmAppointment(conversation)}
+    className="w-full bg-green-500/20 text-green-400 rounded-xl p-3 mb-4"
+  >
+    Confirmar Agendamento
+  </button>
+)}
+
+<div className="space-y-3 max-h-96 overflow-auto">
                       {[...conversation.history]
                         .reverse()
                         .map((msg, idx) => (
