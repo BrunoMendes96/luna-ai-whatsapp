@@ -19,7 +19,6 @@ function App() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [conversations, setConversations] = useState([]);
-  const [refresh, setRefresh] = useState(false);
 
   function login(e) {
     e.preventDefault();
@@ -53,30 +52,65 @@ function App() {
   }
 
   async function updateStatus(phone, status) {
-    async function updateDetails(phone, customer_name, notes) {
-      
-  await fetch(`${API_URL}/api/conversations/details`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      phone,
-      customer_name,
-      notes
-    })
-  });
-
-  setRefresh(!refresh);
-  loadConversations();
-}
     await fetch(`${API_URL}/api/conversations/status`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ phone, status })
     });
 
-    loadConversations();
+    await loadConversations();
+  }
+
+  async function updateDetails(phone, customer_name, notes) {
+    await fetch(`${API_URL}/api/conversations/details`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone, customer_name, notes })
+    });
+
+    await loadConversations();
+  }
+
+  async function confirmAppointment(conversation) {
+    try {
+      const service =
+        prompt("Serviço:", "Piercing") || "Serviço não informado";
+
+      const appointmentDate =
+        prompt("Data e hora:", "25/05 15:00") || "";
+
+      if (!appointmentDate) {
+        return;
+      }
+
+      const response = await fetch(`${API_URL}/api/confirm-appointment`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customer_name: conversation.customer_name || "Cliente",
+          phone: conversation.phone,
+          service,
+          appointment_date: appointmentDate
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(data.error || "Erro ao confirmar agendamento");
+        return;
+      }
+
+      alert("Agendamento confirmado!");
+      await loadConversations();
+    } catch (error) {
+      alert(error.message);
+    }
+  }
+
+  async function cancelAppointment(conversation) {
+    await updateStatus(conversation.phone, "Perdido");
+    alert("Agendamento cancelado.");
   }
 
   useEffect(() => {
@@ -92,7 +126,10 @@ function App() {
   if (!session) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
-        <form onSubmit={login} className="bg-zinc-900 p-8 rounded-2xl w-full max-w-md">
+        <form
+          onSubmit={login}
+          className="bg-zinc-900 p-8 rounded-2xl w-full max-w-md"
+        >
           <h1 className="text-3xl font-bold mb-6">Luna AI</h1>
 
           <input
@@ -136,11 +173,13 @@ function App() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white p-8">
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-[1800px] mx-auto">
         <div className="flex items-center justify-between mb-10">
           <div>
             <h1 className="text-5xl font-bold">Luna AI CRM</h1>
-            <p className="text-zinc-400 mt-3">Logado como {session.user.email}</p>
+            <p className="text-zinc-400 mt-3">
+              Logado como {session.user.email}
+            </p>
           </div>
 
           <button
@@ -181,65 +220,66 @@ function App() {
                     <p className="font-bold text-lg mb-4">
                       {conversation.phone}
                     </p>
-                    <input
-  className="w-full bg-zinc-900 rounded-xl p-3 mb-3"
-  placeholder="Nome do cliente"
-  defaultValue={conversation.customer_name || ""}
-  onBlur={(e) =>
-    updateDetails(
-      conversation.phone,
-      e.target.value,
-      conversation.notes || ""
-    )
-  }
-/>
 
-<textarea
-  className="w-full bg-zinc-900 rounded-xl p-3 mb-4"
-  placeholder="Observações internas"
-  defaultValue={conversation.notes || ""}
-  onBlur={(e) =>
-    updateDetails(
-      conversation.phone,
-      conversation.customer_name || "",
-      e.target.value
-    )
-  }
-/>
+                    <input
+                      className="w-full bg-zinc-900 rounded-xl p-3 mb-3"
+                      placeholder="Nome do cliente"
+                      defaultValue={conversation.customer_name || ""}
+                      onBlur={(e) =>
+                        updateDetails(
+                          conversation.phone,
+                          e.target.value,
+                          conversation.notes || ""
+                        )
+                      }
+                    />
+
+                    <textarea
+                      className="w-full bg-zinc-900 rounded-xl p-3 mb-4"
+                      placeholder="Observações internas"
+                      defaultValue={conversation.notes || ""}
+                      onBlur={(e) =>
+                        updateDetails(
+                          conversation.phone,
+                          conversation.customer_name || "",
+                          e.target.value
+                        )
+                      }
+                    />
 
                     <select
-  className="w-full bg-zinc-900 rounded-xl p-3 mb-4"
-  value={conversation.status || "Novo Lead"}
-  onChange={(e) =>
-    updateStatus(conversation.phone, e.target.value)
-  }
->
-  {STATUS_OPTIONS.map((item) => (
-    <option key={item} value={item}>
-      {item}
-    </option>
-  ))}
-</select>
+                      className="w-full bg-zinc-900 rounded-xl p-3 mb-4"
+                      value={conversation.status || "Novo Lead"}
+                      onChange={(e) =>
+                        updateStatus(conversation.phone, e.target.value)
+                      }
+                    >
+                      {STATUS_OPTIONS.map((item) => (
+                        <option key={item} value={item}>
+                          {item}
+                        </option>
+                      ))}
+                    </select>
 
-<div className="grid grid-cols-2 gap-3 mb-4">
-  <button
-    onClick={() => confirmAppointment(conversation)}
-    className="bg-green-500/20 text-green-400 rounded-xl p-3"
-  >
-    Confirmar
-  </button>
+                    {(conversation.status || "").includes("Aguardando") && (
+                      <div className="grid grid-cols-2 gap-3 mb-4">
+                        <button
+                          onClick={() => confirmAppointment(conversation)}
+                          className="bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded-xl p-3 font-bold"
+                        >
+                          Confirmar
+                        </button>
 
-  <button
-    onClick={() =>
-      updateStatus(conversation.phone, "Perdido")
-    }
-    className="bg-red-500/20 text-red-400 rounded-xl p-3"
-  >
-    Cancelar
-  </button>
-</div>
+                        <button
+                          onClick={() => cancelAppointment(conversation)}
+                          className="bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-xl p-3 font-bold"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    )}
 
-<div className="space-y-3 flex-1 overflow-auto pr-2 min-h-[500px]">
+                    <div className="space-y-3 flex-1 overflow-auto pr-2 min-h-[600px]">
                       {[...conversation.history]
                         .reverse()
                         .map((msg, idx) => (
