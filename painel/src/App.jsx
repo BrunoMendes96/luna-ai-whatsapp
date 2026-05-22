@@ -313,6 +313,8 @@ function App() {
                 ))}
             </div>
           ))}
+        </div>
+
           <div className="mt-16">
   <h2 className="text-3xl font-bold mb-6">
     Agendamentos Confirmados
@@ -352,12 +354,11 @@ function App() {
           Telefone
         </p>
 
-        <p>{appointment.phone}</p>
+                <p>{appointment.phone}</p>
       </div>
     ))}
   </div>
 </div>
-        </div>
       </div>
     </div>
   );
