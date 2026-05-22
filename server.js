@@ -387,50 +387,16 @@ function detectAppointment(text) {
   const message = text.toLowerCase();
 
   const wantsAppointment =
-    message.includes("agendamento") ||
-    message.includes("agendar") ||
-    message.includes("marcar") ||
-    message.includes("horário") ||
-    message.includes("horario") ||
-    message.includes("às") ||
-    message.includes("as ");
-
-  if (!wantsAppointment) return null;
-
-  let service = "Serviço não informado";
-
-  if (message.includes("piercing")) service = "Piercing";
-  if (message.includes("tattoo") || message.includes("tatuagem")) service = "Tattoo";
-  if (message.includes("estética") || message.includes("estetica")) service = "Estética";
-
-  const dateMatch =
-    text.match(/\d{1,2}[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?/) ||
-    text.match(/dia\s+\d{1,2}/i);
-
-  const hourMatch =
-    text.match(/\d{1,2}h\d{0,2}/i) ||
-    text.match(/\d{1,2}:\d{2}/) ||
-    text.match(/às\s+\d{1,2}/i) ||
-    text.match(/as\s+\d{1,2}/i);
-
-  if (!dateMatch || !hourMatch) return null;
-
-  return {
-    service,
-    appointment_date: `${dateMatch[0]} ${hourMatch[0]}`
-  };
-}
-  const message = text.toLowerCase();
-
-  const wantsAppointment =
-    message.includes("agendar") ||
-    message.includes("marcar") ||
-    message.includes("marca") ||
-    message.includes("horário") ||
-    message.includes("horario") ||
-    message.includes("vaga");
-
-  if (!wantsAppointment) {
+  message.includes("agendamento") ||
+  message.includes("agendar") ||
+  message.includes("marcar") ||
+  message.includes("marca") ||
+  message.includes("horário") ||
+  message.includes("horario") ||
+  message.includes("vaga") ||
+  message.includes("às") ||
+  message.includes("as ");
+ if (!wantsAppointment) {
     return null;
   }
 
