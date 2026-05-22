@@ -412,6 +412,77 @@ function detectAppointment(text) {
   };
 }
 
+app.post("/api/confirm-appointment", async (req, res) => {
+  try {
+    const {
+      customer_name,
+      phone,
+      service,
+      appointment_date
+    } = req.body;
+
+    const { data: existing } = await supabase
+      .from("appointments")
+      .select("*")
+      .eq("appointment_date", appointment_date)
+      .eq("confirmed", true);
+
+    if (existing && existing.length > 0) {
+      return res.status(400).json({
+        error: "Horário já ocupado"
+      });
+    }
+
+    const { error } = await supabase
+      .from("appointments")
+      .insert({
+        customer_name,
+        phone,
+        service,
+        appointment_date,
+        confirmed: true
+      });
+
+    if (error) {
+      return res.status(500).json({
+        error: error.message
+      });
+    }
+
+    await supabase
+      .from("conversations")
+      .update({
+        status: "Fechado"
+      })
+      .eq("phone", phone);
+
+    const confirmationMessage = `Agendamento confirmado 😊
+
+Serviço: ${service}
+Data/Hora: ${appointment_date}
+
+Esperamos você 💙`;
+
+    await sendWhatsAppMessage(
+      phone,
+      confirmationMessage
+    );
+
+    res.json({
+      success: true
+    });
+  } catch (error) {
+    console.error(
+      "ERRO CONFIRMAR:",
+      error.message
+    );
+
+    res.status(500).json({
+      error: error.message
+    });
+  }
+});
+
 app.listen(process.env.PORT || 3000, () => {
   console.log(`Super Agente rodando na porta ${process.env.PORT || 3000}`);
 });
