@@ -317,7 +317,7 @@ Vi que você entrou em contato conosco e queria saber se ainda deseja agendar ou
                       className="w-full bg-purple-500/20 text-purple-400 rounded-xl p-3 mb-4"
                     >
                       Agendar Cliente
-                      {conversation.status === "Aguardando Confirmação" && (
+                      {(conversation.status || "").includes("Aguardando") && (
   <button
     onClick={() =>
       confirmAppointment(conversation)

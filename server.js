@@ -130,10 +130,23 @@ app.post("/webhook", async (req, res) => {
 
     const history = await getHistory(from);
 
-    const response = await openai.responses.create({
-      model: "gpt-4.1-mini",
-      input: buildAgentPrompt(userText, history)
-    });
+    input: `
+Você é uma atendente profissional da Luna Studio.
+
+REGRAS:
+- Responda curto.
+- Seja natural.
+- Não confirme agendamentos.
+- Não invente horários.
+- Quando cliente quiser marcar horário, diga que vai verificar disponibilidade.
+- Nunca diga que o agendamento foi confirmado automaticamente.
+
+Histórico:
+${JSON.stringify(history)}
+
+Cliente:
+${userText}
+`
 
 let reply =  response.output_text ||
   "Obrigada pela mensagem ✨ Vou encaminhar para uma atendente confirmar certinho com você.";
