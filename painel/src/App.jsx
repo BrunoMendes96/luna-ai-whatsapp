@@ -227,7 +227,7 @@ async function loadAppointments() {
                 .map((conversation, index) => (
                   <div
                     key={index}
-                    className="bg-zinc-800 rounded-2xl p-5 mb-5 min-h-[850px] flex flex-col"
+                    className="bg-zinc-800 rounded-2xl p-5 mb-5 h-[620px] flex flex-col"
                   >
                     <p className="font-bold text-lg mb-4">
                       {conversation.phone}
@@ -291,7 +291,7 @@ async function loadAppointments() {
                       </div>
                     )}
 
-                    <div className="space-y-3 flex-1 overflow-auto pr-2 min-h-[600px]">
+                    <div className="space-y-3 flex-1 overflow-y-auto pr-2 min-h-0">
                       {[...conversation.history]
                         .reverse()
                         .map((msg, idx) => (
