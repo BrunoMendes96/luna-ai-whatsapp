@@ -135,8 +135,7 @@ app.post("/webhook", async (req, res) => {
       input: buildAgentPrompt(userText, history)
     });
 
-    constlet reply =
-  response.output_text ||
+let reply =  response.output_text ||
   "Obrigada pela mensagem ✨ Vou encaminhar para uma atendente confirmar certinho com você.";
 
 const appointment = detectAppointment(userText);
