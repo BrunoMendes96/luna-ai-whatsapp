@@ -391,35 +391,46 @@ app.post("/api/followup", async (req, res) => {
 
 app.post("/api/appointments", async (req, res) => {
   try {
-    const {
+    const { customer_name, phone, service, appointment_date } = req.body;
+
+    const { error } = await supabase.from("appointments").insert({
       customer_name,
       phone,
       service,
       appointment_date
-    } = req.body;
-
-    const { error } = await supabase
-      .from("appointments")
-      .insert({
-        customer_name,
-        phone,
-        service,
-        appointment_date
-      });
+    });
 
     if (error) {
       return res.status(500).json({ error: error.message });
     }
 
-    res.json({
-      success: true
-    });
-  } catch (error) {
-    console.error("ERRO AGENDAMENTO:", error.message);
+    await supabase
+      .from("conversations")
+      .update({ status: "Fechado", customer_name })
+      .eq("phone", phone);
 
-    res.status(500).json({
-      error: error.message
+    const confirmationMessage = `Perfeito 😊 Agendamento confirmado!
+
+Nome: ${customer_name}
+Serviço: ${service}
+Data/Hora: ${appointment_date}
+
+Qualquer coisa é só me chamar.`;
+
+    await sendWhatsAppMessage(phone, confirmationMessage);
+
+    await supabase.from("conversations").insert({
+      phone,
+      role: "assistant",
+      content: confirmationMessage,
+      status: "Fechado",
+      customer_name
     });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error("ERRO AGENDAMENTO:", error.response?.data || error.message);
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -446,47 +457,35 @@ function detectAppointment(text) {
   const wantsAppointment =
     message.includes("agendar") ||
     message.includes("marcar") ||
-    message.includes("horário") ||
-    message.includes("horario") ||
-    message.includes("consulta") ||
-    message.includes("marcação");
+    message.includes("marca") ||
+    message.includes("quero horário") ||
+    message.includes("quero horario") ||
+    message.includes("tem vaga") ||
+    message.includes("reservar");
 
-  if (!wantsAppointment) {
-    return null;
-  }
+  if (!wantsAppointment) return null;
 
   let service = "Serviço não informado";
 
-  if (message.includes("piercing")) {
-    service = "Piercing";
-  }
+  if (message.includes("piercing")) service = "Piercing";
+  if (message.includes("tattoo") || message.includes("tatuagem")) service = "Tattoo";
+  if (message.includes("estética") || message.includes("estetica")) service = "Estética";
 
-  if (message.includes("tattoo") || message.includes("tatuagem")) {
-    service = "Tattoo";
-  }
+  const dateMatch =
+    text.match(/\d{1,2}[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?/) ||
+    text.match(/dia\s+\d{1,2}/i);
 
-  if (message.includes("estética") || message.includes("estetica")) {
-    service = "Estética";
-  }
+  const hourMatch =
+    text.match(/\d{1,2}h\d{0,2}/i) ||
+    text.match(/\d{1,2}:\d{2}/) ||
+    text.match(/às\s+\d{1,2}/i) ||
+    text.match(/as\s+\d{1,2}/i);
 
-  const dateMatch = text.match(
-    /(\d{1,2}[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?)/
-  );
-
-  const hourMatch = text.match(
-    /(\d{1,2})(?:h|:)(\d{2})?/
-  );
-
-  if (!dateMatch || !hourMatch) {
-    return null;
-  }
-
-  const date = dateMatch[1];
-  const hour = hourMatch[0];
+  if (!dateMatch || !hourMatch) return null;
 
   return {
     service,
-    appointment_date: `${date} ${hour}`
+    appointment_date: `${dateMatch[0]} ${hourMatch[0]}`
   };
 }
 
