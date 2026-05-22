@@ -27,6 +27,11 @@ const [password, setPassword] = useState(
 const [remember, setRemember] = useState(true);
   const [conversations, setConversations] = useState([]);
   const [appointments, setAppointments] = useState([]);
+  const [lastCount, setLastCount] = useState(0);
+
+const notificationSound = new Audio(
+  "https://actions.google.com/sounds/v1/cartoon/pop.ogg"
+);
 
   function login(e) {
     e.preventDefault();
@@ -57,6 +62,17 @@ const [remember, setRemember] = useState(true);
     const response = await fetch(`${API_URL}/api/conversations`);
     const data = await response.json();
     setConversations(data);
+    if (lastCount !== 0 && data.length > lastCount) {
+  notificationSound.play();
+
+  if (Notification.permission === "granted") {
+    new Notification("Nova conversa recebida", {
+      body: "Você recebeu uma nova mensagem no CRM."
+    });
+  }
+}
+
+setLastCount(data.length);
   }
 
   async function loadAppointments() {
@@ -115,6 +131,7 @@ const [remember, setRemember] = useState(true);
   }
 
   useEffect(() => {
+    Notification.requestPermission();
     if (!session) return;
 
     loadConversations();
@@ -243,7 +260,9 @@ function Column({
       <div className="space-y-4">
         {filtered.map((conversation) => (
           <div key={conversation.phone} className="bg-zinc-800 rounded-2xl p-3">
-            <p className="font-bold text-sm mb-3">{conversation.phone}</p>
+            <p className="font-bold text-sm mb-3">
+  {conversation.phone}
+</p>
 
             <input
               className="w-full bg-zinc-900 rounded-lg p-2 mb-2 text-sm"
