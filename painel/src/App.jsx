@@ -176,7 +176,7 @@ function App() {
                 .map((conversation, index) => (
                   <div
                     key={index}
-                    className="bg-zinc-800 rounded-2xl p-5 mb-5"
+                    className="bg-zinc-800 rounded-2xl p-5 mb-5 min-h-[850px]"
                   >
                     <p className="font-bold text-lg mb-4">
                       {conversation.phone}
@@ -239,7 +239,7 @@ function App() {
   </button>
 </div>
 
-<div className="space-y-3 h-[500px] overflow-auto pr-2">
+<div className="space-y-3 h-[800px] overflow-auto pr-2">
                       {[...conversation.history]
                         .reverse()
                         .map((msg, idx) => (
