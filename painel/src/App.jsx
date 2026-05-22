@@ -79,6 +79,43 @@ function Dashboard({ logout, user }) {
     loadConversations();
   }
 
+async function createAppointment(conversation) {
+  const customerName =
+    conversation.customer_name ||
+    prompt("Nome do cliente:", "") ||
+    "Cliente";
+
+  const service =
+    prompt("Serviço:", "Piercing") ||
+    "Serviço não informado";
+
+  const appointmentDate =
+    prompt("Data e hora do agendamento:", "2026-05-22 15:00") ||
+    "";
+
+  if (!appointmentDate) {
+    alert("Agendamento cancelado.");
+    return;
+  }
+
+  await fetch(`${API_URL}/api/appointments`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      customer_name: customerName,
+      phone: conversation.phone,
+      service,
+      appointment_date: appointmentDate
+    })
+  });
+
+  await updateStatus(conversation.phone, "Fechado");
+
+  alert("Agendamento criado e lead marcado como Fechado.");
+}
+
 async function updateDetails(phone, customer_name, notes) {
   await fetch(`${API_URL}/api/conversations/details`, {
     method: "POST",
@@ -206,6 +243,12 @@ Vi que você entrou em contato conosco e queria saber se ainda deseja agendar ou
   className="w-full bg-blue-500/20 text-blue-400 rounded-xl p-3 mb-4"
 >
   Enviar Follow-up IA
+
+<button
+  onClick={() => createAppointment(conversation)}
+  className="w-full bg-purple-500/20 text-purple-400 rounded-xl p-3 mb-4"
+>
+  Agendar Cliente
 </button>
 
                     <div className="space-y-3 max-h-80 overflow-auto">
