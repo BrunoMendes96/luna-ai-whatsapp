@@ -53,9 +53,23 @@ function App() {
 
 function Dashboard({ logout, user }) {
   const [conversations, setConversations] = useState([]);
+const [appointments, setAppointments] = useState([]);
   const [debug, setDebug] = useState("Carregando...");
 
   async function loadConversations() {
+    async function loadAppointments() {
+  try {
+    const response = await fetch(
+      `${API_URL}/api/appointments`
+    );
+
+    const data = await response.json();
+
+    setAppointments(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
     try {
       const response = await fetch(`${API_URL}/api/conversations`);
       const data = await response.json();
@@ -77,6 +91,7 @@ function Dashboard({ logout, user }) {
     });
 
     loadConversations();
+    loadAppointments();
   }
 
 async function createAppointment(conversation) {
@@ -155,6 +170,10 @@ Vi que você entrou em contato conosco e queria saber se ainda deseja agendar ou
     loadConversations();
     const interval = setInterval(loadConversations, 3000);
     return () => clearInterval(interval);
+    const interval = setInterval(() => {
+  loadConversations();
+  loadAppointments();
+}, 3000);
   }, []);
 
   const totalNovo = conversations.filter((c) => c.status === "Novo Lead").length;
@@ -181,6 +200,7 @@ Vi que você entrou em contato conosco e queria saber se ainda deseja agendar ou
           <Card title="Novos Leads" value={totalNovo} />
           <Card title="Em Atendimento" value={totalAtendimento} />
           <Card title="Fechados" value={totalFechado} />
+          <Card title="Agendamentos" value={appointments.length} />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-5">
@@ -271,6 +291,36 @@ Vi que você entrou em contato conosco e queria saber se ainda deseja agendar ou
   );
 }
 
+<div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 mt-10">
+  <h2 className="text-3xl font-bold mb-8">
+    Agenda de Agendamentos
+  </h2>
+
+  <div className="space-y-4">
+    {appointments.map((appointment, index) => (
+      <div
+        key={index}
+        className="bg-zinc-800 rounded-2xl p-5"
+      >
+        <p className="text-lg font-bold">
+          {appointment.customer_name}
+        </p>
+
+        <p className="text-zinc-400">
+          {appointment.phone}
+        </p>
+
+        <p className="mt-3">
+          Serviço: {appointment.service}
+        </p>
+
+        <p className="text-green-400 mt-2">
+          {appointment.appointment_date}
+        </p>
+      </div>
+    ))}
+  </div>
+</div>
 function Card({ title, value }) {
   return (
     <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6">
