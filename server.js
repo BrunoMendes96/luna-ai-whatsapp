@@ -341,6 +341,31 @@ app.post("/api/conversations/details", async (req, res) => {
   }
 });
 
+app.post("/api/followup", async (req, res) => {
+  try {
+    const { phone, message } = req.body;
+
+    if (!phone || !message) {
+      return res.status(400).json({ error: "phone e message são obrigatórios" });
+    }
+
+    await sendWhatsAppMessage(phone, message);
+
+    await supabase.from("conversations").insert({
+      phone,
+      role: "assistant",
+      content: message,
+      status: "Em Atendimento",
+      last_followup: new Date().toISOString()
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error("ERRO FOLLOWUP:", error.response?.data || error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.listen(process.env.PORT || 3000, () => {
   console.log(`Super Agente rodando na porta ${process.env.PORT || 3000}`);
 });
