@@ -156,6 +156,8 @@ let reply =
   response.output_text ||
   "Obrigada pela mensagem ✨ Vou encaminhar para uma atendente confirmar certinho com você.";
 
+  const appointment = detectAppointment(userText);
+  
   if (appointment) {
   await supabase
     .from("conversations")
