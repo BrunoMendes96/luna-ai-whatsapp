@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 
 const API_URL = "https://luna-ai-whatsapp-production.up.railway.app";
-
 const STATUS_OPTIONS = ["Novo Lead", "Em Atendimento", "Fechado", "Perdido"];
 
 function App() {
@@ -16,8 +15,8 @@ function App() {
   function login(e) {
     e.preventDefault();
 
-    if (email === "bruno.coop32@icloud.com" && password === "jaftYw-nirke9-dibsak") {
-      const adminSession = { user: { email: "bruno.coop32@icloud.com" } };
+    if (email === "bruno32@icloud.com" && password === "jaftYw-nirke9-dibsab") {
+      const adminSession = { user: { email: "bruno32@icloud.com" } };
       localStorage.setItem("luna_admin", JSON.stringify(adminSession));
       setSession(adminSession);
       return;
@@ -39,7 +38,6 @@ function App() {
           <p className="text-zinc-400 mt-2 mb-8">Login do painel admin</p>
 
           <input className="w-full bg-zinc-800 rounded-xl p-4 mb-4 outline-none" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
-
           <input className="w-full bg-zinc-800 rounded-xl p-4 mb-6 outline-none" placeholder="Senha" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
 
           <button className="w-full bg-white text-black rounded-xl p-4 font-bold">Entrar</button>
@@ -53,27 +51,13 @@ function App() {
 
 function Dashboard({ logout, user }) {
   const [conversations, setConversations] = useState([]);
-const [appointments, setAppointments] = useState([]);
+  const [appointments, setAppointments] = useState([]);
   const [debug, setDebug] = useState("Carregando...");
 
   async function loadConversations() {
-    async function loadAppointments() {
-  try {
-    const response = await fetch(
-      `${API_URL}/api/appointments`
-    );
-
-    const data = await response.json();
-
-    setAppointments(data);
-  } catch (error) {
-    console.error(error);
-  }
-}
     try {
       const response = await fetch(`${API_URL}/api/conversations`);
       const data = await response.json();
-
       setConversations(data);
       setDebug(`OK - ${data.length} conversa(s) carregada(s)`);
     } catch (error) {
@@ -81,102 +65,87 @@ const [appointments, setAppointments] = useState([]);
     }
   }
 
+  async function loadAppointments() {
+    try {
+      const response = await fetch(`${API_URL}/api/appointments`);
+      const data = await response.json();
+      setAppointments(data);
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
   async function updateStatus(phone, status) {
     await fetch(`${API_URL}/api/conversations/status`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ phone, status })
     });
 
     loadConversations();
-    loadAppointments();
   }
 
-async function createAppointment(conversation) {
-  const customerName =
-    conversation.customer_name ||
-    prompt("Nome do cliente:", "") ||
-    "Cliente";
+  async function updateDetails(phone, customer_name, notes) {
+    await fetch(`${API_URL}/api/conversations/details`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone, customer_name, notes })
+    });
 
-  const service =
-    prompt("Serviço:", "Piercing") ||
-    "Serviço não informado";
-
-  const appointmentDate =
-    prompt("Data e hora do agendamento:", "2026-05-22 15:00") ||
-    "";
-
-  if (!appointmentDate) {
-    alert("Agendamento cancelado.");
-    return;
+    loadConversations();
   }
 
-  await fetch(`${API_URL}/api/appointments`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      customer_name: customerName,
-      phone: conversation.phone,
-      service,
-      appointment_date: appointmentDate
-    })
-  });
-
-  await updateStatus(conversation.phone, "Fechado");
-
-  alert("Agendamento criado e lead marcado como Fechado.");
-}
-
-async function updateDetails(phone, customer_name, notes) {
-  await fetch(`${API_URL}/api/conversations/details`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      phone,
-      customer_name,
-      notes
-    })
-  });
-
-  loadConversations();
-}
-
-async function sendFollowup(phone, customerName) {
-  const message = `Oi ${customerName} 😊
+  async function sendFollowup(phone, customerName) {
+    const message = `Oi ${customerName} 😊
 
 Vi que você entrou em contato conosco e queria saber se ainda deseja agendar ou tirar dúvidas. Estou à disposição 💙`;
 
-  await fetch(`${API_URL}/api/followup`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      phone,
-      message
-    })
-  });
+    await fetch(`${API_URL}/api/followup`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone, message })
+    });
 
-  alert("Follow-up enviado.");
-}
+    alert("Follow-up enviado.");
+  }
+
+  async function createAppointment(conversation) {
+    const customerName = conversation.customer_name || prompt("Nome do cliente:", "") || "Cliente";
+    const service = prompt("Serviço:", "Piercing") || "Serviço não informado";
+    const appointmentDate = prompt("Data e hora:", "2026-05-22 15:00") || "";
+
+    if (!appointmentDate) return;
+
+    await fetch(`${API_URL}/api/appointments`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        customer_name: customerName,
+        phone: conversation.phone,
+        service,
+        appointment_date: appointmentDate
+      })
+    });
+
+    await updateStatus(conversation.phone, "Fechado");
+    loadAppointments();
+
+    alert("Agendamento criado.");
+  }
 
   useEffect(() => {
     loadConversations();
-    const interval = setInterval(loadConversations, 3000);
-    return () => clearInterval(interval);
+    loadAppointments();
+
     const interval = setInterval(() => {
-  loadConversations();
-  loadAppointments();
-}, 3000);
+      loadConversations();
+      loadAppointments();
+    }, 3000);
+
+    return () => clearInterval(interval);
   }, []);
 
-  const totalNovo = conversations.filter((c) => c.status === "Novo Lead").length;
+  const totalNovo = conversations.filter((c) => (c.status || "Novo Lead") === "Novo Lead").length;
   const totalAtendimento = conversations.filter((c) => c.status === "Em Atendimento").length;
   const totalFechado = conversations.filter((c) => c.status === "Fechado").length;
 
@@ -195,12 +164,29 @@ Vi que você entrou em contato conosco e queria saber se ainda deseja agendar ou
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-5 mb-10">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-5 mb-10">
           <Card title="Conversas" value={conversations.length} />
           <Card title="Novos Leads" value={totalNovo} />
           <Card title="Em Atendimento" value={totalAtendimento} />
           <Card title="Fechados" value={totalFechado} />
           <Card title="Agendamentos" value={appointments.length} />
+        </div>
+
+        <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 mb-10">
+          <h2 className="text-3xl font-bold mb-8">Agenda</h2>
+
+          {appointments.length === 0 && <p className="text-zinc-400">Nenhum agendamento ainda.</p>}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {appointments.map((appointment) => (
+              <div key={appointment.id} className="bg-zinc-800 rounded-2xl p-5">
+                <p className="text-lg font-bold">{appointment.customer_name}</p>
+                <p className="text-zinc-400">{appointment.phone}</p>
+                <p className="mt-3">Serviço: {appointment.service}</p>
+                <p className="text-green-400 mt-2">{appointment.appointment_date}</p>
+              </div>
+            ))}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-5">
@@ -213,33 +199,21 @@ Vi que você entrou em contato conosco e queria saber se ainda deseja agendar ou
                 .map((conversation, index) => (
                   <div key={index} className="bg-zinc-800 rounded-2xl p-5 mb-5">
                     <p className="text-sm text-zinc-400 mb-2">Cliente</p>
-                    <div className="mb-4">
-  <input
-    className="w-full bg-zinc-900 rounded-xl p-3 mb-3"
-    placeholder="Nome do cliente"
-    defaultValue={conversation.customer_name || ""}
-    onBlur={(e) =>
-      updateDetails(
-        conversation.phone,
-        e.target.value,
-        conversation.notes || ""
-      )
-    }
-  />
+                    <p className="font-bold mb-4">{conversation.phone}</p>
 
-  <textarea
-    className="w-full bg-zinc-900 rounded-xl p-3"
-    placeholder="Observações internas"
-    defaultValue={conversation.notes || ""}
-    onBlur={(e) =>
-      updateDetails(
-        conversation.phone,
-        conversation.customer_name || "",
-        e.target.value
-      )
-    }
-  />
-</div>
+                    <input
+                      className="w-full bg-zinc-900 rounded-xl p-3 mb-3"
+                      placeholder="Nome do cliente"
+                      defaultValue={conversation.customer_name || ""}
+                      onBlur={(e) => updateDetails(conversation.phone, e.target.value, conversation.notes || "")}
+                    />
+
+                    <textarea
+                      className="w-full bg-zinc-900 rounded-xl p-3 mb-4"
+                      placeholder="Observações internas"
+                      defaultValue={conversation.notes || ""}
+                      onBlur={(e) => updateDetails(conversation.phone, conversation.customer_name || "", e.target.value)}
+                    />
 
                     <select
                       className="w-full bg-zinc-900 rounded-xl p-3 mb-4"
@@ -253,23 +227,19 @@ Vi que você entrou em contato conosco e queria saber se ainda deseja agendar ou
                       ))}
                     </select>
 
-<button
-  onClick={() =>
-    sendFollowup(
-      conversation.phone,
-      conversation.customer_name || "cliente"
-    )
-  }
-  className="w-full bg-blue-500/20 text-blue-400 rounded-xl p-3 mb-4"
->
-  Enviar Follow-up IA
+                    <button
+                      onClick={() => sendFollowup(conversation.phone, conversation.customer_name || "cliente")}
+                      className="w-full bg-blue-500/20 text-blue-400 rounded-xl p-3 mb-3"
+                    >
+                      Enviar Follow-up IA
+                    </button>
 
-<button
-  onClick={() => createAppointment(conversation)}
-  className="w-full bg-purple-500/20 text-purple-400 rounded-xl p-3 mb-4"
->
-  Agendar Cliente
-</button>
+                    <button
+                      onClick={() => createAppointment(conversation)}
+                      className="w-full bg-purple-500/20 text-purple-400 rounded-xl p-3 mb-4"
+                    >
+                      Agendar Cliente
+                    </button>
 
                     <div className="space-y-3 max-h-80 overflow-auto">
                       {conversation.history.map((msg, idx) => (
@@ -291,36 +261,6 @@ Vi que você entrou em contato conosco e queria saber se ainda deseja agendar ou
   );
 }
 
-<div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 mt-10">
-  <h2 className="text-3xl font-bold mb-8">
-    Agenda de Agendamentos
-  </h2>
-
-  <div className="space-y-4">
-    {appointments.map((appointment, index) => (
-      <div
-        key={index}
-        className="bg-zinc-800 rounded-2xl p-5"
-      >
-        <p className="text-lg font-bold">
-          {appointment.customer_name}
-        </p>
-
-        <p className="text-zinc-400">
-          {appointment.phone}
-        </p>
-
-        <p className="mt-3">
-          Serviço: {appointment.service}
-        </p>
-
-        <p className="text-green-400 mt-2">
-          {appointment.appointment_date}
-        </p>
-      </div>
-    ))}
-  </div>
-</div>
 function Card({ title, value }) {
   return (
     <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6">
