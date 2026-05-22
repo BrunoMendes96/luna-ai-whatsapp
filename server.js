@@ -322,6 +322,25 @@ app.post("/api/conversations/status", async (req, res) => {
   }
 });
 
+app.post("/api/conversations/details", async (req, res) => {
+  try {
+    const { phone, customer_name, notes } = req.body;
+
+    const { error } = await supabase
+      .from("conversations")
+      .update({ customer_name, notes })
+      .eq("phone", phone);
+
+    if (error) {
+      return res.status(500).json({ error: error.message });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.listen(process.env.PORT || 3000, () => {
   console.log(`Super Agente rodando na porta ${process.env.PORT || 3000}`);
 });
