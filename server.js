@@ -366,6 +366,40 @@ app.post("/api/followup", async (req, res) => {
   }
 });
 
+app.post("/api/appointments", async (req, res) => {
+  try {
+    const {
+      customer_name,
+      phone,
+      service,
+      appointment_date
+    } = req.body;
+
+    const { error } = await supabase
+      .from("appointments")
+      .insert({
+        customer_name,
+        phone,
+        service,
+        appointment_date
+      });
+
+    if (error) {
+      return res.status(500).json({ error: error.message });
+    }
+
+    res.json({
+      success: true
+    });
+  } catch (error) {
+    console.error("ERRO AGENDAMENTO:", error.message);
+
+    res.status(500).json({
+      error: error.message
+    });
+  }
+});
+
 app.listen(process.env.PORT || 3000, () => {
   console.log(`Super Agente rodando na porta ${process.env.PORT || 3000}`);
 });
