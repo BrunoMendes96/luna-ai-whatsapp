@@ -264,7 +264,7 @@ function Dashboard({ session, logout }) {
           <Metric title="Fechados" value={totals.fechado} />
         </section>
 
-        <section className="grid grid-cols-1 xl:grid-cols-[360px_minmax(760px,1fr)_360px] gap-4">
+        <section className="grid grid-cols-1 gap-6">
           <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-5">
             <div className="flex items-center justify-between gap-4 mb-5">
               <h2 className="text-2xl font-bold">Funil</h2>
@@ -294,7 +294,7 @@ function Dashboard({ session, logout }) {
             <div className="mt-6 bg-zinc-950 border border-zinc-800 rounded-3xl p-4">
               <h3 className="text-xl font-bold mb-4">Fechados</h3>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-5">
                 {filteredConversations
                   .filter((item) => item.status === "Fechado")
                   .reverse()
@@ -467,7 +467,7 @@ function KanbanColumn({
     .reverse();
 
   return (
-    <div className="bg-zinc-950 border border-zinc-800 rounded-3xl p-4 min-h-[520px]">
+  <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-4 h-[680px] overflow-y-auto">
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-bold">{status}</h3>
         <span className="bg-zinc-800 text-zinc-300 rounded-full px-3 py-1 text-sm">
@@ -480,7 +480,7 @@ function KanbanColumn({
           <button
             key={conversation.phone}
             onClick={() => setSelectedPhone(conversation.phone)}
-            className={`w-full text-left rounded-xl p-2 text-sm transition ${
+            className={`w-full text-left rounded-2xl p-3 transition ${
               selectedPhone === conversation.phone
                 ? "bg-blue-500/20 border border-blue-500/40"
                 : "bg-zinc-800 hover:bg-zinc-700 border border-transparent"
