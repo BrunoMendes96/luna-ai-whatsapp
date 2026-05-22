@@ -1,8 +1,13 @@
 import { useEffect, useState } from "react";
 
 const API_URL = "https://luna-ai-whatsapp-production.up.railway.app";
-const STATUS_OPTIONS = ["Novo Lead", "Em Atendimento", "Fechado", "Perdido"];
-
+const STATUS_OPTIONS = [
+  "Novo Lead",
+  "Em Atendimento",
+  "Aguardando Confirmação",
+  "Fechado",
+  "Perdido"
+];const STATUS_OPTIONS = [
 function App() {
   const [session, setSession] = useState(() => {
     const saved = localStorage.getItem("luna_admin");

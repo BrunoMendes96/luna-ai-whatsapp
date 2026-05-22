@@ -142,38 +142,22 @@ app.post("/webhook", async (req, res) => {
 const appointment = detectAppointment(userText);
 
 if (appointment) {
-  await supabase.from("appointments").insert({
-    customer_name: "Cliente WhatsApp",
-    phone: from,
-    service: appointment.service,
-    appointment_date: appointment.appointment_date
-  });
-
   await supabase
     .from("conversations")
-    .update({ status: "Fechado" })
+    .update({
+      status: "Aguardando Confirmação"
+    })
     .eq("phone", from);
 
-  reply = `Perfeito 😊 Agendamento confirmado!
+  reply = `Perfeito 😊
+
+Recebi seu pedido de agendamento para:
 
 Serviço: ${appointment.service}
-Data/Hora: ${appointment.appointment_date}
+Horário solicitado: ${appointment.appointment_date}
 
-Qualquer coisa é só me chamar.`;
+Vou verificar disponibilidade e já confirmo para você 💙`;
 }
-
-await saveMessage(from, "assistant", reply);
-
-console.log("Resposta IA:", reply);
-
-await sendWhatsAppMessage(from, reply);
-
-    return res.sendStatus(200);
-  } catch (error) {
-    console.error("ERRO NO WEBHOOK:", error.response?.data || error.message);
-    return res.sendStatus(200);
-  }
-});
 
 async function transcribeWhatsAppAudio(mediaId) {
   console.log("Buscando URL do áudio na Meta...");
