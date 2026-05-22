@@ -147,13 +147,16 @@ ${JSON.stringify(history)}
 Cliente:
 ${userText}
 `
+const response = await openai.responses.create({
+  model: "gpt-4.1-mini",
+  input: buildAgentPrompt(userText, history)
+});
 
-let reply =  response.output_text ||
+let reply =
+  response.output_text ||
   "Obrigada pela mensagem ✨ Vou encaminhar para uma atendente confirmar certinho com você.";
 
-const appointment = detectAppointment(userText);
-
-if (appointment) {
+  if (appointment) {
   await supabase
     .from("conversations")
     .update({
