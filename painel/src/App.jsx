@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 
 const API_URL = "https://luna-ai-whatsapp-production.up.railway.app";
 
+const STATUS_OPTIONS = ["Novo Lead", "Em Atendimento", "Fechado", "Perdido"];
+
 function App() {
   const [session, setSession] = useState(() => {
     const saved = localStorage.getItem("luna_admin");
@@ -14,8 +16,8 @@ function App() {
   function login(e) {
     e.preventDefault();
 
-    if (email === "bruno.coop32@icloud.com" && password === "jaftYw-nirke9-dibsak") {
-      const adminSession = { user: { email: "bruno.coop32@icloud.com" } };
+    if (email === "admin@luna.com" && password === "123456") {
+      const adminSession = { user: { email: "admin@luna.com" } };
       localStorage.setItem("luna_admin", JSON.stringify(adminSession));
       setSession(adminSession);
       return;
@@ -65,20 +67,34 @@ function Dashboard({ logout, user }) {
     }
   }
 
+  async function updateStatus(phone, status) {
+    await fetch(`${API_URL}/api/conversations/status`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ phone, status })
+    });
+
+    loadConversations();
+  }
+
   useEffect(() => {
     loadConversations();
-
     const interval = setInterval(loadConversations, 3000);
-
     return () => clearInterval(interval);
   }, []);
+
+  const totalNovo = conversations.filter((c) => c.status === "Novo Lead").length;
+  const totalAtendimento = conversations.filter((c) => c.status === "Em Atendimento").length;
+  const totalFechado = conversations.filter((c) => c.status === "Fechado").length;
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white p-8">
       <div className="max-w-7xl mx-auto">
         <div className="flex items-center justify-between mb-10">
           <div>
-            <h1 className="text-5xl font-bold">Luna AI Dashboard</h1>
+            <h1 className="text-5xl font-bold">Luna AI CRM</h1>
             <p className="text-zinc-400 mt-3">Logado como {user.email}</p>
             <p className="text-green-400 mt-2">{debug}</p>
           </div>
@@ -88,31 +104,49 @@ function Dashboard({ logout, user }) {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-10">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-5 mb-10">
           <Card title="Conversas" value={conversations.length} />
-          <Card title="IA" value="Online" />
-          <Card title="Backend" value="Railway" />
+          <Card title="Novos Leads" value={totalNovo} />
+          <Card title="Em Atendimento" value={totalAtendimento} />
+          <Card title="Fechados" value={totalFechado} />
         </div>
 
-        <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6">
-          <h2 className="text-3xl font-bold mb-8">Conversas Reais</h2>
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-5">
+          {STATUS_OPTIONS.map((status) => (
+            <div key={status} className="bg-zinc-900 border border-zinc-800 rounded-3xl p-5">
+              <h2 className="text-xl font-bold mb-5">{status}</h2>
 
-          {conversations.length === 0 && (
-            <p className="text-zinc-400">Nenhuma conversa encontrada ainda.</p>
-          )}
+              {conversations
+                .filter((conversation) => (conversation.status || "Novo Lead") === status)
+                .map((conversation, index) => (
+                  <div key={index} className="bg-zinc-800 rounded-2xl p-5 mb-5">
+                    <p className="text-sm text-zinc-400 mb-2">Cliente</p>
+                    <p className="font-bold mb-4">{conversation.phone}</p>
 
-          {conversations.map((conversation, index) => (
-            <div key={index} className="bg-zinc-800 rounded-2xl p-6 mb-6">
-              <p className="text-sm text-zinc-400 mb-4">Cliente: {conversation.phone}</p>
+                    <select
+                      className="w-full bg-zinc-900 rounded-xl p-3 mb-4"
+                      value={conversation.status || "Novo Lead"}
+                      onChange={(e) => updateStatus(conversation.phone, e.target.value)}
+                    >
+                      {STATUS_OPTIONS.map((item) => (
+                        <option key={item} value={item}>
+                          {item}
+                        </option>
+                      ))}
+                    </select>
 
-              {conversation.history.map((msg, idx) => (
-                <div key={idx} className={`p-4 rounded-xl mb-3 ${msg.role === "user" ? "bg-zinc-700" : "bg-green-500/20"}`}>
-                  <p className="text-xs text-zinc-400 mb-1">
-                    {msg.role === "user" ? "Cliente" : "IA"}
-                  </p>
-                  <p>{msg.content}</p>
-                </div>
-              ))}
+                    <div className="space-y-3 max-h-80 overflow-auto">
+                      {conversation.history.map((msg, idx) => (
+                        <div key={idx} className={`p-3 rounded-xl ${msg.role === "user" ? "bg-zinc-700" : "bg-green-500/20"}`}>
+                          <p className="text-xs text-zinc-400 mb-1">
+                            {msg.role === "user" ? "Cliente" : "IA"}
+                          </p>
+                          <p className="text-sm">{msg.content}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
             </div>
           ))}
         </div>
