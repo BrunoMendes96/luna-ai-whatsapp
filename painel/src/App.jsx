@@ -15,6 +15,7 @@ const STATUS_OPTIONS = [
   "Perdido"
 ];
 ];const STATUS_OPTIONS = [
+
 function App() {
   const [session, setSession] = useState(() => {
     const saved = localStorage.getItem("luna_admin");
@@ -122,6 +123,48 @@ Vi que você entrou em contato conosco e queria saber se ainda deseja agendar ou
   }
 
   async function createAppointment(conversation) {
+    async function confirmAppointment(conversation) {
+  const service =
+    prompt("Serviço:", "Piercing") ||
+    "Serviço não informado";
+
+  const appointmentDate =
+    prompt("Data e hora:", "25/05 15h") ||
+    "";
+
+  if (!appointmentDate) {
+    return;
+  }
+
+  const response = await fetch(
+    `${API_URL}/api/confirm-appointment`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        customer_name:
+          conversation.customer_name || "Cliente",
+        phone: conversation.phone,
+        service,
+        appointment_date: appointmentDate
+      })
+    }
+  );
+
+  const result = await response.json();
+
+  if (!response.ok) {
+    alert(result.error || "Erro ao confirmar");
+    return;
+  }
+
+  await loadAppointments();
+  await loadConversations();
+
+  alert("Agendamento confirmado.");
+}
   const customerName =
     conversation.customer_name ||
     prompt("Nome do cliente:", "") ||
@@ -274,6 +317,16 @@ Vi que você entrou em contato conosco e queria saber se ainda deseja agendar ou
                       className="w-full bg-purple-500/20 text-purple-400 rounded-xl p-3 mb-4"
                     >
                       Agendar Cliente
+                      {conversation.status === "Aguardando Confirmação" && (
+  <button
+    onClick={() =>
+      confirmAppointment(conversation)
+    }
+    className="w-full bg-green-500/20 text-green-400 rounded-xl p-3 mb-4"
+  >
+    Confirmar Agendamento
+  </button>
+)}
                     </button>
 
                     <div className="space-y-3 max-h-80 overflow-auto">
