@@ -27,7 +27,7 @@ const [password, setPassword] = useState(
 const [remember, setRemember] = useState(true);
   const [conversations, setConversations] = useState([]);
   const [appointments, setAppointments] = useState([]);
-  const [lastCount, setLastCount] = useState(0);
+  const [lastMessageCount, setLastMessageCount] = useState(0);
 
 const notificationSound = new Audio(
   "https://actions.google.com/sounds/v1/cartoon/pop.ogg"
@@ -62,6 +62,25 @@ const notificationSound = new Audio(
     const response = await fetch(`${API_URL}/api/conversations`);
     const data = await response.json();
     setConversations(data);
+    const totalMessages = data.reduce((total, conversation) => {
+  return total + (conversation.history?.length || 0);
+}, 0);
+
+if (lastMessageCount !== 0 && totalMessages > lastMessageCount) {
+  try {
+    notificationSound.play();
+  } catch (error) {
+    console.log("Som bloqueado pelo navegador:", error.message);
+  }
+
+  if ("Notification" in window && Notification.permission === "granted") {
+    new Notification("Nova mensagem recebida", {
+      body: "Chegou uma nova mensagem no Luna AI CRM."
+    });
+  }
+}
+
+setLastMessageCount(totalMessages);
     if (lastCount !== 0 && data.length > lastCount) {
   notificationSound.play();
 
@@ -131,7 +150,9 @@ setLastCount(data.length);
   }
 
   useEffect(() => {
-    Notification.requestPermission();
+    if ("Notification" in window && Notification.permission !== "granted") {
+  Notification.requestPermission();
+}
     if (!session) return;
 
     loadConversations();
