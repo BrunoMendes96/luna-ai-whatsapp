@@ -221,14 +221,23 @@ function App() {
   ))}
 </select>
 
-{(conversation.status || "").includes("Aguardando") && (
+<div className="grid grid-cols-2 gap-3 mb-4">
   <button
     onClick={() => confirmAppointment(conversation)}
-    className="w-full bg-green-500/20 text-green-400 rounded-xl p-3 mb-4"
+    className="bg-green-500/20 text-green-400 rounded-xl p-3"
   >
-    Confirmar Agendamento
+    Confirmar
   </button>
-)}
+
+  <button
+    onClick={() =>
+      updateStatus(conversation.phone, "Perdido")
+    }
+    className="bg-red-500/20 text-red-400 rounded-xl p-3"
+  >
+    Cancelar
+  </button>
+</div>
 
 <div className="space-y-3 h-[500px] overflow-auto pr-2">
                       {[...conversation.history]
