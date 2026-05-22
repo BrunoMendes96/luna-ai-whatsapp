@@ -53,7 +53,7 @@ function App() {
           className="bg-zinc-900 border border-zinc-800 p-8 rounded-3xl w-full max-w-md shadow-2xl"
         >
           <h1 className="text-4xl font-bold mb-2">Luna AI</h1>
-          <p className="text-zinc-400 mb-8">Painel administrativo</p>
+          <p className="text-zinc-400 mb-5">Painel administrativo</p>
 
           <input
             className="w-full bg-zinc-800 border border-zinc-700 p-4 rounded-2xl mb-4 outline-none"
@@ -228,7 +228,7 @@ function Dashboard({ session, logout }) {
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
       <div className="max-w-[1900px] mx-auto p-6">
-        <header className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 mb-8">
+        <header className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-5">
           <div>
             <h1 className="text-4xl lg:text-5xl font-bold">Luna AI CRM</h1>
             <p className="text-zinc-400 mt-2">
@@ -256,7 +256,7 @@ function Dashboard({ session, logout }) {
           </div>
         </header>
 
-        <section className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+        <section className="grid grid-cols-2 md:grid-cols-5 gap-4 5">
           <Metric title="Conversas" value={totals.all} />
           <Metric title="Novos" value={totals.novo} />
           <Metric title="Atendimento" value={totals.atendimento} />
@@ -264,7 +264,7 @@ function Dashboard({ session, logout }) {
           <Metric title="Fechados" value={totals.fechado} />
         </section>
 
-        <section className="grid grid-cols-1 xl:grid-cols-[360px_minmax(760px,1fr)_360px] gap-6">
+        <section className="grid grid-cols-1 xl:grid-cols-[360px_minmax(760px,1fr)_360px] gap-4">
           <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-5">
             <div className="flex items-center justify-between gap-4 mb-5">
               <h2 className="text-2xl font-bold">Funil</h2>
@@ -316,7 +316,7 @@ function Dashboard({ session, logout }) {
             </div>
           </div>
 
-          <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-5 h-[88vh] flex flex-col">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-5 h-[78vh] flex flex-col">
             {selectedConversation ? (
               <>
                 <div className="mb-5">
@@ -412,7 +412,7 @@ function Dashboard({ session, logout }) {
             )}
           </div>
 
-          <aside className="bg-zinc-900 border border-zinc-800 rounded-3xl p-5 h-[88vh] overflow-y-auto">
+          <aside className="bg-zinc-900 border border-zinc-800 rounded-3xl p-5 h-[78vh] overflow-y-auto">
             <h2 className="text-2xl font-bold mb-5">
               Agendamentos Confirmados
             </h2>
@@ -425,7 +425,7 @@ function Dashboard({ session, logout }) {
               {appointments.map((appointment) => (
                 <div
                   key={appointment.id}
-                  className="bg-zinc-800 rounded-2xl p-4"
+                  className="bg-zinc-800 rounded-xl p-2 text-sm"
                 >
                   <p className="font-bold text-lg">
                     {appointment.customer_name || "Cliente"}
@@ -480,7 +480,7 @@ function KanbanColumn({
           <button
             key={conversation.phone}
             onClick={() => setSelectedPhone(conversation.phone)}
-            className={`w-full text-left rounded-2xl p-4 transition ${
+            className={`w-full text-left rounded-xl p-2 text-sm transition ${
               selectedPhone === conversation.phone
                 ? "bg-blue-500/20 border border-blue-500/40"
                 : "bg-zinc-800 hover:bg-zinc-700 border border-transparent"
