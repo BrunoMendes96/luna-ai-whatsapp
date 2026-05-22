@@ -135,15 +135,38 @@ app.post("/webhook", async (req, res) => {
       input: buildAgentPrompt(userText, history)
     });
 
-    const reply =
-      response.output_text ||
-      "Obrigada pela mensagem ✨ Vou encaminhar para uma atendente confirmar certinho com você.";
+    let reply =
+  response.output_text ||
+  "Obrigada pela mensagem ✨ Vou encaminhar para uma atendente confirmar certinho com você.";
 
-    await saveMessage(from, "assistant", reply);
+const appointment = detectAppointment(userText);
 
-    console.log("Resposta IA:", reply);
+if (appointment) {
+  await supabase.from("appointments").insert({
+    customer_name: "Cliente WhatsApp",
+    phone: from,
+    service: appointment.service,
+    appointment_date: appointment.appointment_date
+  });
 
-    await sendWhatsAppMessage(from, reply);
+  await supabase
+    .from("conversations")
+    .update({ status: "Fechado" })
+    .eq("phone", from);
+
+  reply = `Perfeito 😊 Agendamento confirmado!
+
+Serviço: ${appointment.service}
+Data/Hora: ${appointment.appointment_date}
+
+Qualquer coisa é só me chamar.`;
+}
+
+await saveMessage(from, "assistant", reply);
+
+console.log("Resposta IA:", reply);
+
+await sendWhatsAppMessage(from, reply);
 
     return res.sendStatus(200);
   } catch (error) {
@@ -416,6 +439,56 @@ app.get("/api/appointments", async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+function detectAppointment(text) {
+  const message = text.toLowerCase();
+
+  const wantsAppointment =
+    message.includes("agendar") ||
+    message.includes("marcar") ||
+    message.includes("horário") ||
+    message.includes("horario") ||
+    message.includes("consulta") ||
+    message.includes("marcação");
+
+  if (!wantsAppointment) {
+    return null;
+  }
+
+  let service = "Serviço não informado";
+
+  if (message.includes("piercing")) {
+    service = "Piercing";
+  }
+
+  if (message.includes("tattoo") || message.includes("tatuagem")) {
+    service = "Tattoo";
+  }
+
+  if (message.includes("estética") || message.includes("estetica")) {
+    service = "Estética";
+  }
+
+  const dateMatch = text.match(
+    /(\d{1,2}[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?)/
+  );
+
+  const hourMatch = text.match(
+    /(\d{1,2})(?:h|:)(\d{2})?/
+  );
+
+  if (!dateMatch || !hourMatch) {
+    return null;
+  }
+
+  const date = dateMatch[1];
+  const hour = hourMatch[0];
+
+  return {
+    service,
+    appointment_date: `${date} ${hour}`
+  };
+}
 
 app.listen(process.env.PORT || 3000, () => {
   console.log(`Super Agente rodando na porta ${process.env.PORT || 3000}`);
