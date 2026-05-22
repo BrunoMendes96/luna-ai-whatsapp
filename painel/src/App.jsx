@@ -19,6 +19,7 @@ function App() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [conversations, setConversations] = useState([]);
+  const [refresh, setRefresh] = useState(false);
 
   function login(e) {
     e.preventDefault();
@@ -52,6 +53,22 @@ function App() {
   }
 
   async function updateStatus(phone, status) {
+    async function updateDetails(phone, customer_name, notes) {
+  await fetch(`${API_URL}/api/conversations/details`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      phone,
+      customer_name,
+      notes
+    })
+  });
+
+  setRefresh(!refresh);
+  loadConversations();
+}
     await fetch(`${API_URL}/api/conversations/status`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -163,6 +180,31 @@ function App() {
                     <p className="font-bold text-lg mb-4">
                       {conversation.phone}
                     </p>
+                    <input
+  className="w-full bg-zinc-900 rounded-xl p-3 mb-3"
+  placeholder="Nome do cliente"
+  defaultValue={conversation.customer_name || ""}
+  onBlur={(e) =>
+    updateDetails(
+      conversation.phone,
+      e.target.value,
+      conversation.notes || ""
+    )
+  }
+/>
+
+<textarea
+  className="w-full bg-zinc-900 rounded-xl p-3 mb-4"
+  placeholder="Observações internas"
+  defaultValue={conversation.notes || ""}
+  onBlur={(e) =>
+    updateDetails(
+      conversation.phone,
+      conversation.customer_name || "",
+      e.target.value
+    )
+  }
+/>
 
                     <select
                       className="w-full bg-zinc-900 rounded-xl p-3 mb-4"
