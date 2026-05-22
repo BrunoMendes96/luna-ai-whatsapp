@@ -7,13 +7,7 @@ const STATUS_OPTIONS = [
   "Aguardando Confirmação",
   "Fechado",
   "Perdido"
-];const STATUS_OPTIONS = [
-  "Novo Lead",
-  "Em Atendimento",
-  "Aguardando Confirmação",
-  "Fechado",
-  "Perdido"
-];
+]
 
 function App() {
   const [session, setSession] = useState(() => {
