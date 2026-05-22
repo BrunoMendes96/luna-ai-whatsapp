@@ -1,54 +1,28 @@
 import { useEffect, useState } from "react";
-import { supabase } from "./supabaseClient.js";
+
 function App() {
   const [session, setSession] = useState(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  async function login(e) {
-  e.preventDefault();
+  function login(e) {
+    e.preventDefault();
 
-  if (email === "bruno.coop32@icloud.com" && password === "jaftYw-nirke9-dibsak") {
-    setSession({
-      user: {
-        email: "bruno.coop32@icloud.com"
-      }
-    });
-    return;
-  }
-
-  alert("Email ou senha incorretos");
-}
-
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    });
-
-    if (error) {
-      alert("Erro no login: " + error.message);
+    if (email === "admin@luna.com" && password === "123456") {
+      setSession({
+        user: {
+          email: "admin@luna.com"
+        }
+      });
+      return;
     }
+
+    alert("Email ou senha incorretos");
   }
 
-  async function logout() {
-    await supabase.auth.signOut();
+  function logout() {
+    setSession(null);
   }
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-    });
-
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      (_event, sessionData) => {
-        setSession(sessionData);
-      }
-    );
-
-    return () => {
-      listener.subscription.unsubscribe();
-    };
-  }, []);
 
   if (!session) {
     return (
@@ -90,32 +64,18 @@ function Dashboard({ logout, user }) {
   const [conversations, setConversations] = useState([]);
 
   async function loadConversations() {
-    const response = await fetch("https://luna-ai-whatsapp-production.up.railway.app/api/conversations");
+    const response = await fetch(
+      "https://luna-ai-whatsapp-production.up.railway.app/api/conversations"
+    );
+
     const data = await response.json();
     setConversations(data);
   }
 
   useEffect(() => {
     loadConversations();
-
-    const channel = supabase
-      .channel("realtime-conversations")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "conversations"
-        },
-        () => {
-          loadConversations();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    const interval = setInterval(loadConversations, 3000);
+    return () => clearInterval(interval);
   }, []);
 
   return (
@@ -138,7 +98,7 @@ function Dashboard({ logout, user }) {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-10">
           <Card title="Conversas" value={conversations.length} />
           <Card title="IA" value="Online" />
-          <Card title="Tempo real" value="Ativo" />
+          <Card title="Backend" value="Railway" />
         </div>
 
         <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6">
