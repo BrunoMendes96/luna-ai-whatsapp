@@ -158,7 +158,6 @@ Horário solicitado: ${appointment.appointment_date}
 
 Vou verificar disponibilidade e já confirmo para você 💙`;
 }
-
 async function transcribeWhatsAppAudio(mediaId) {
   console.log("Buscando URL do áudio na Meta...");
 

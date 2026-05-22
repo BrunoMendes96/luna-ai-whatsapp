@@ -8,6 +8,13 @@ const STATUS_OPTIONS = [
   "Fechado",
   "Perdido"
 ];const STATUS_OPTIONS = [
+  "Novo Lead",
+  "Em Atendimento",
+  "Aguardando Confirmação",
+  "Fechado",
+  "Perdido"
+];
+];const STATUS_OPTIONS = [
 function App() {
   const [session, setSession] = useState(() => {
     const saved = localStorage.getItem("luna_admin");
