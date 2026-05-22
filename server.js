@@ -51,10 +51,16 @@ app.get("/api/conversations", async (req, res) => {
 
   data.forEach((item) => {
     if (!grouped[item.phone]) {
+      grouped[item.phone].status = item.status || grouped[item.phone].status || "Novo Lead";
+grouped[item.phone].customer_name = item.customer_name || grouped[item.phone].customer_name || "";
+grouped[item.phone].notes = item.notes || grouped[item.phone].notes || "";
       grouped[item.phone] = {
-        phone: item.phone,
-        history: []
-      };
+  phone: item.phone,
+  status: item.status || "Novo Lead",
+  customer_name: item.customer_name || "",
+  notes: item.notes || "",
+  history: []
+};
     }
 
     grouped[item.phone].history.push({
@@ -378,6 +384,42 @@ app.post("/api/conversations/details", async (req, res) => {
 });
 
 function detectAppointment(text) {
+  const message = text.toLowerCase();
+
+  const wantsAppointment =
+    message.includes("agendamento") ||
+    message.includes("agendar") ||
+    message.includes("marcar") ||
+    message.includes("horário") ||
+    message.includes("horario") ||
+    message.includes("às") ||
+    message.includes("as ");
+
+  if (!wantsAppointment) return null;
+
+  let service = "Serviço não informado";
+
+  if (message.includes("piercing")) service = "Piercing";
+  if (message.includes("tattoo") || message.includes("tatuagem")) service = "Tattoo";
+  if (message.includes("estética") || message.includes("estetica")) service = "Estética";
+
+  const dateMatch =
+    text.match(/\d{1,2}[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?/) ||
+    text.match(/dia\s+\d{1,2}/i);
+
+  const hourMatch =
+    text.match(/\d{1,2}h\d{0,2}/i) ||
+    text.match(/\d{1,2}:\d{2}/) ||
+    text.match(/às\s+\d{1,2}/i) ||
+    text.match(/as\s+\d{1,2}/i);
+
+  if (!dateMatch || !hourMatch) return null;
+
+  return {
+    service,
+    appointment_date: `${dateMatch[0]} ${hourMatch[0]}`
+  };
+}
   const message = text.toLowerCase();
 
   const wantsAppointment =
