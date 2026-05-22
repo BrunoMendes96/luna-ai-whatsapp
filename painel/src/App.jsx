@@ -79,6 +79,22 @@ function Dashboard({ logout, user }) {
     loadConversations();
   }
 
+async function updateDetails(phone, customer_name, notes) {
+  await fetch(`${API_URL}/api/conversations/details`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      phone,
+      customer_name,
+      notes
+    })
+  });
+
+  loadConversations();
+}
+
   useEffect(() => {
     loadConversations();
     const interval = setInterval(loadConversations, 3000);
@@ -121,7 +137,33 @@ function Dashboard({ logout, user }) {
                 .map((conversation, index) => (
                   <div key={index} className="bg-zinc-800 rounded-2xl p-5 mb-5">
                     <p className="text-sm text-zinc-400 mb-2">Cliente</p>
-                    <p className="font-bold mb-4">{conversation.phone}</p>
+                    <div className="mb-4">
+  <input
+    className="w-full bg-zinc-900 rounded-xl p-3 mb-3"
+    placeholder="Nome do cliente"
+    defaultValue={conversation.customer_name || ""}
+    onBlur={(e) =>
+      updateDetails(
+        conversation.phone,
+        e.target.value,
+        conversation.notes || ""
+      )
+    }
+  />
+
+  <textarea
+    className="w-full bg-zinc-900 rounded-xl p-3"
+    placeholder="Observações internas"
+    defaultValue={conversation.notes || ""}
+    onBlur={(e) =>
+      updateDetails(
+        conversation.phone,
+        conversation.customer_name || "",
+        e.target.value
+      )
+    }
+  />
+</div>
 
                     <select
                       className="w-full bg-zinc-900 rounded-xl p-3 mb-4"
