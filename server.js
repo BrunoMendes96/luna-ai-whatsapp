@@ -219,18 +219,14 @@ async function getHistory(phone) {
 
 async function sendWhatsAppMessage(to, text) {
   try {
-    const audioPath = await generateSpeechAudio(text);
-
-    const mediaId = await uploadWhatsAppAudio(audioPath);
-
     await axios.post(
       `https://graph.facebook.com/v20.0/${process.env.PHONE_NUMBER_ID}/messages`,
       {
         messaging_product: "whatsapp",
         to,
-        type: "audio",
-        audio: {
-          id: mediaId
+        type: "text",
+        text: {
+          body: text
         }
       },
       {
@@ -241,16 +237,12 @@ async function sendWhatsAppMessage(to, text) {
       }
     );
 
-    fs.unlinkSync(audioPath);
-
-    console.log("Áudio enviado com sucesso.");
+    console.log("Mensagem enviada com sucesso.");
   } catch (error) {
     console.error(
-      "ERRO AO ENVIAR ÁUDIO:",
+      "ERRO AO ENVIAR WHATSAPP:",
       error.response?.data || error.message
     );
-
-    await sendTextFallback(to, text);
   }
 }
 
