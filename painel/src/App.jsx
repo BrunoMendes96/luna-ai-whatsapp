@@ -16,8 +16,8 @@ function App() {
   function login(e) {
     e.preventDefault();
 
-    if (email === "admin@luna.com" && password === "123456") {
-      const adminSession = { user: { email: "admin@luna.com" } };
+    if (email === "bruno.coop32@icloud.com" && password === "jaftYw-nirke9-dibsak") {
+      const adminSession = { user: { email: "bruno.coop32@icloud.com" } };
       localStorage.setItem("luna_admin", JSON.stringify(adminSession));
       setSession(adminSession);
       return;
