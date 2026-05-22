@@ -110,28 +110,51 @@ Vi que você entrou em contato conosco e queria saber se ainda deseja agendar ou
   }
 
   async function createAppointment(conversation) {
-    const customerName = conversation.customer_name || prompt("Nome do cliente:", "") || "Cliente";
-    const service = prompt("Serviço:", "Piercing") || "Serviço não informado";
-    const appointmentDate = prompt("Data e hora:", "2026-05-22 15:00") || "";
+  const customerName =
+    conversation.customer_name ||
+    prompt("Nome do cliente:", "") ||
+    "Cliente";
 
-    if (!appointmentDate) return;
+  const service =
+    prompt("Serviço:", "Piercing") ||
+    "Serviço não informado";
 
-    await fetch(`${API_URL}/api/appointments`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        customer_name: customerName,
-        phone: conversation.phone,
-        service,
-        appointment_date: appointmentDate
-      })
-    });
+  const appointmentDate =
+    prompt("Data e hora:", "2026-05-22 15:00") ||
+    "";
 
-    await updateStatus(conversation.phone, "Fechado");
-    loadAppointments();
-
-    alert("Agendamento criado.");
+  if (!appointmentDate) {
+    alert("Agendamento cancelado.");
+    return;
   }
+
+  const response = await fetch(`${API_URL}/api/appointments`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      customer_name: customerName,
+      phone: conversation.phone,
+      service,
+      appointment_date: appointmentDate
+    })
+  });
+
+  const result = await response.json();
+
+  if (!response.ok) {
+    alert("Erro ao criar agendamento: " + (result.error || "erro desconhecido"));
+    return;
+  }
+
+  await updateStatus(conversation.phone, "Fechado");
+
+  await loadAppointments();
+  await loadConversations();
+
+  alert("Agendamento criado com sucesso.");
+}
 
   useEffect(() => {
     loadConversations();
