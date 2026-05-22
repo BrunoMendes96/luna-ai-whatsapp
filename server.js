@@ -278,52 +278,85 @@ Vou verificar disponibilidade 💙`;
   }
 });
 
-app.post(
-  "/api/confirm-appointment",
-  async (req, res) => {
-    try {
-      const {
+app.post("/api/confirm-appointment", async (req, res) => {
+  try {
+    const {
+      customer_name,
+      phone,
+      service,
+      appointment_date
+    } = req.body;
+
+    const { data: existing, error: checkError } = await supabase
+      .from("appointments")
+      .select("*")
+      .eq("appointment_date", appointment_date)
+      .eq("confirmed", true);
+
+    if (checkError) {
+      return res.status(500).json({
+        error: checkError.message
+      });
+    }
+
+    if (existing && existing.length > 0) {
+      return res.status(400).json({
+        error: "Esse horário já está ocupado."
+      });
+    }
+
+    const { error } = await supabase
+      .from("appointments")
+      .insert({
         customer_name,
         phone,
         service,
-        appointment_date
-      } = req.body;
-
-      await supabase
-        .from("appointments")
-        .insert({
-          customer_name,
-          phone,
-          service,
-          appointment_date,
-          confirmed: true
-        });
-
-      await supabase
-        .from("conversations")
-        .update({
-          status: "Fechado"
-        })
-        .eq("phone", phone);
-
-      await sendWhatsAppMessage(
-        phone,
-        `Agendamento confirmado 😊
-
-Serviço: ${service}
-Data/Hora: ${appointment_date}`
-      );
-
-      res.json({
-        success: true
+        appointment_date,
+        confirmed: true
       });
-    } catch (error) {
-      res.status(500).json({
+
+    if (error) {
+      return res.status(500).json({
         error: error.message
       });
     }
+
+    await supabase
+      .from("conversations")
+      .update({
+        status: "Fechado",
+        customer_name
+      })
+      .eq("phone", phone);
+
+    const confirmationMessage = `Agendamento confirmado 😊
+
+Serviço: ${service}
+Data/Hora: ${appointment_date}
+
+Esperamos você 💙`;
+
+    await sendWhatsAppMessage(phone, confirmationMessage);
+
+    await supabase.from("conversations").insert({
+      phone,
+      role: "assistant",
+      content: confirmationMessage,
+      status: "Fechado",
+      customer_name
+    });
+
+    res.json({
+      success: true
+    });
+  } catch (error) {
+    console.error("ERRO CONFIRMAR:", error.response?.data || error.message);
+
+    res.status(500).json({
+      error: error.message
+    });
   }
-);
+});
 
 app.listen(
   process.env.PORT || 3000,
