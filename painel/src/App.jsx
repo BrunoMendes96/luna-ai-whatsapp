@@ -286,7 +286,7 @@ function Dashboard({ logout, user }) {
                           )}
                         </select>
 
-                        <div className="space-y-3 max-h-80 overflow-auto flex flex-col-reverse">
+                        <div className="space-y-3 max-h-80 overflow-auto">
                           {[...conversation.history]
                             .reverse()
                             .map(
