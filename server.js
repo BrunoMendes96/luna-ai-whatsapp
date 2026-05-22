@@ -372,6 +372,27 @@ Esperamos você 💙`;
   }
 });
 
+app.get("/api/appointments", async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("appointments")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      return res.status(500).json({
+        error: error.message
+      });
+    }
+
+    res.json(data || []);
+  } catch (error) {
+    res.status(500).json({
+      error: error.message
+    });
+  }
+});
+
 app.listen(
   process.env.PORT || 3000,
   () => {
