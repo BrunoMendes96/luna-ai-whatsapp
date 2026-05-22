@@ -16,8 +16,15 @@ function App() {
     return saved ? JSON.parse(saved) : null;
   });
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState(
+  localStorage.getItem("saved_email") || ""
+);
+
+const [password, setPassword] = useState(
+  localStorage.getItem("saved_password") || ""
+);
+
+const [remember, setRemember] = useState(true);
   const [conversations, setConversations] = useState([]);
   const [appointments, setAppointments] = useState([]);
 
@@ -30,6 +37,10 @@ function App() {
     ) {
       const adminSession = { user: { email: "bruno.coop32@icloud.com" } };
       localStorage.setItem("luna_admin", JSON.stringify(adminSession));
+      if (remember) {
+  localStorage.setItem("saved_email", email);
+  localStorage.setItem("saved_password", password);
+}
       setSession(adminSession);
       return;
     }
@@ -137,6 +148,18 @@ function App() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
+
+<div className="flex items-center gap-2 mb-5">
+  <input
+    type="checkbox"
+    checked={remember}
+    onChange={(e) => setRemember(e.target.checked)}
+  />
+
+  <p className="text-sm text-zinc-400">
+    Lembrar acesso
+  </p>
+</div>
 
           <button className="w-full bg-white text-black p-3 rounded-xl font-bold">
             Entrar
