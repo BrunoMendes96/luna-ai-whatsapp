@@ -135,7 +135,7 @@ app.post("/webhook", async (req, res) => {
       input: buildAgentPrompt(userText, history)
     });
 
-    let reply =
+    constlet reply =
   response.output_text ||
   "Obrigada pela mensagem ✨ Vou encaminhar para uma atendente confirmar certinho com você.";
 
@@ -158,6 +158,19 @@ Horário solicitado: ${appointment.appointment_date}
 
 Vou verificar disponibilidade e já confirmo para você 💙`;
 }
+    await saveMessage(from, "assistant", reply);
+
+    console.log("Resposta IA:", reply);
+
+    await sendWhatsAppMessage(from, reply);
+
+    return res.sendStatus(200);
+  } catch (error) {
+    console.error("ERRO NO WEBHOOK:", error.response?.data || error.message);
+    return res.sendStatus(200);
+  }
+});
+
 async function transcribeWhatsAppAudio(mediaId) {
   console.log("Buscando URL do áudio na Meta...");
 
@@ -347,93 +360,6 @@ app.post("/api/conversations/details", async (req, res) => {
   }
 });
 
-app.post("/api/followup", async (req, res) => {
-  try {
-    const { phone, message } = req.body;
-
-    if (!phone || !message) {
-      return res.status(400).json({ error: "phone e message são obrigatórios" });
-    }
-
-    await sendWhatsAppMessage(phone, message);
-
-    await supabase.from("conversations").insert({
-      phone,
-      role: "assistant",
-      content: message,
-      status: "Em Atendimento",
-      last_followup: new Date().toISOString()
-    });
-
-    res.json({ success: true });
-  } catch (error) {
-    console.error("ERRO FOLLOWUP:", error.response?.data || error.message);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.post("/api/appointments", async (req, res) => {
-  try {
-    const { customer_name, phone, service, appointment_date } = req.body;
-
-    const { error } = await supabase.from("appointments").insert({
-      customer_name,
-      phone,
-      service,
-      appointment_date
-    });
-
-    if (error) {
-      return res.status(500).json({ error: error.message });
-    }
-
-    await supabase
-      .from("conversations")
-      .update({ status: "Fechado", customer_name })
-      .eq("phone", phone);
-
-    const confirmationMessage = `Perfeito 😊 Agendamento confirmado!
-
-Nome: ${customer_name}
-Serviço: ${service}
-Data/Hora: ${appointment_date}
-
-Qualquer coisa é só me chamar.`;
-
-    await sendWhatsAppMessage(phone, confirmationMessage);
-
-    await supabase.from("conversations").insert({
-      phone,
-      role: "assistant",
-      content: confirmationMessage,
-      status: "Fechado",
-      customer_name
-    });
-
-    res.json({ success: true });
-  } catch (error) {
-    console.error("ERRO AGENDAMENTO:", error.response?.data || error.message);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.get("/api/appointments", async (req, res) => {
-  try {
-    const { data, error } = await supabase
-      .from("appointments")
-      .select("*")
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      return res.status(500).json({ error: error.message });
-    }
-
-    res.json(data || []);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
 function detectAppointment(text) {
   const message = text.toLowerCase();
 
@@ -441,30 +367,45 @@ function detectAppointment(text) {
     message.includes("agendar") ||
     message.includes("marcar") ||
     message.includes("marca") ||
-    message.includes("quero horário") ||
-    message.includes("quero horario") ||
-    message.includes("tem vaga") ||
-    message.includes("reservar");
+    message.includes("horário") ||
+    message.includes("horario") ||
+    message.includes("vaga");
 
-  if (!wantsAppointment) return null;
+  if (!wantsAppointment) {
+    return null;
+  }
 
   let service = "Serviço não informado";
 
-  if (message.includes("piercing")) service = "Piercing";
-  if (message.includes("tattoo") || message.includes("tatuagem")) service = "Tattoo";
-  if (message.includes("estética") || message.includes("estetica")) service = "Estética";
+  if (message.includes("piercing")) {
+    service = "Piercing";
+  }
 
-  const dateMatch =
-    text.match(/\d{1,2}[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?/) ||
-    text.match(/dia\s+\d{1,2}/i);
+  if (
+    message.includes("tattoo") ||
+    message.includes("tatuagem")
+  ) {
+    service = "Tattoo";
+  }
+
+  if (
+    message.includes("estética") ||
+    message.includes("estetica")
+  ) {
+    service = "Estética";
+  }
+
+  const dateMatch = text.match(
+    /\d{1,2}[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?/
+  );
 
   const hourMatch =
     text.match(/\d{1,2}h\d{0,2}/i) ||
-    text.match(/\d{1,2}:\d{2}/) ||
-    text.match(/às\s+\d{1,2}/i) ||
-    text.match(/as\s+\d{1,2}/i);
+    text.match(/\d{1,2}:\d{2}/);
 
-  if (!dateMatch || !hourMatch) return null;
+  if (!dateMatch || !hourMatch) {
+    return null;
+  }
 
   return {
     service,
