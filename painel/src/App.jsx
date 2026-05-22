@@ -159,7 +159,7 @@ function App() {
           <Card title="Fechados" value={totalFechado} />
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-6">
           {STATUS_OPTIONS.map((status) => (
             <div
               key={status}
@@ -176,7 +176,7 @@ function App() {
                 .map((conversation, index) => (
                   <div
                     key={index}
-                    className="bg-zinc-800 rounded-2xl p-5 mb-5 min-h-[850px]"
+                    className="bg-zinc-800 rounded-2xl p-5 mb-5 min-h-[850px] flex flex-col"
                   >
                     <p className="font-bold text-lg mb-4">
                       {conversation.phone}
@@ -239,7 +239,7 @@ function App() {
   </button>
 </div>
 
-<div className="space-y-3 h-[800px] overflow-auto pr-2">
+<div className="space-y-3 flex-1 overflow-auto pr-2 min-h-[500px]">
                       {[...conversation.history]
                         .reverse()
                         .map((msg, idx) => (
