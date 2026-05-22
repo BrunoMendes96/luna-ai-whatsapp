@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const API_URL = "https://luna-ai-whatsapp-production.up.railway.app";
 
@@ -27,7 +27,7 @@ const [password, setPassword] = useState(
 const [remember, setRemember] = useState(true);
   const [conversations, setConversations] = useState([]);
   const [appointments, setAppointments] = useState([]);
-  const [lastMessageCount, setLastMessageCount] = useState(0);
+  const lastMessageCountRef = useRef(0);
 
 const notificationSound = new Audio(
   "https://actions.google.com/sounds/v1/cartoon/pop.ogg"
@@ -62,6 +62,24 @@ const notificationSound = new Audio(
     const response = await fetch(`${API_URL}/api/conversations`);
     const data = await response.json();
     setConversations(data);
+    const totalMessages = data.reduce((total, conversation) => {
+  return total + (conversation.history?.length || 0);
+}, 0);
+
+if (
+  lastMessageCountRef.current !== 0 &&
+  totalMessages > lastMessageCountRef.current
+) {
+  alert("Nova mensagem recebida!");
+
+  try {
+    notificationSound.play();
+  } catch (error) {
+    console.log("Som bloqueado:", error.message);
+  }
+}
+
+lastMessageCountRef.current = totalMessages;
     const totalMessages = data.reduce((total, conversation) => {
   return total + (conversation.history?.length || 0);
 }, 0);
