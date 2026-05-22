@@ -8,10 +8,10 @@ function App() {
   function login(e) {
     e.preventDefault();
 
-    if (email === "admin@luna.com" && password === "123456") {
+    if (email === "bruno.coop32@icloud.com" && password === "jaftYw-nirke9-dibsak") {
       setSession({
         user: {
-          email: "admin@luna.com"
+          email: "bruno.coop32@icloud.com"
         }
       });
       return;
