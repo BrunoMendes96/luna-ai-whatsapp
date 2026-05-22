@@ -14,7 +14,6 @@ const STATUS_OPTIONS = [
   "Fechado",
   "Perdido"
 ];
-];const STATUS_OPTIONS = [
 
 function App() {
   const [session, setSession] = useState(() => {
@@ -272,7 +271,7 @@ Vi que você entrou em contato conosco e queria saber se ainda deseja agendar ou
             <div key={status} className="bg-zinc-900 border border-zinc-800 rounded-3xl p-5">
               <h2 className="text-xl font-bold mb-5">{status}</h2>
 
-              {conversations
+              
                 {[...conversations]
   .reverse()
   .filter((conversation) => (conversation.status || "Novo Lead") === status)
