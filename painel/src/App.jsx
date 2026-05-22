@@ -95,6 +95,25 @@ async function updateDetails(phone, customer_name, notes) {
   loadConversations();
 }
 
+async function sendFollowup(phone, customerName) {
+  const message = `Oi ${customerName} 😊
+
+Vi que você entrou em contato conosco e queria saber se ainda deseja agendar ou tirar dúvidas. Estou à disposição 💙`;
+
+  await fetch(`${API_URL}/api/followup`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      phone,
+      message
+    })
+  });
+
+  alert("Follow-up enviado.");
+}
+
   useEffect(() => {
     loadConversations();
     const interval = setInterval(loadConversations, 3000);
@@ -176,6 +195,18 @@ async function updateDetails(phone, customer_name, notes) {
                         </option>
                       ))}
                     </select>
+
+<button
+  onClick={() =>
+    sendFollowup(
+      conversation.phone,
+      conversation.customer_name || "cliente"
+    )
+  }
+  className="w-full bg-blue-500/20 text-blue-400 rounded-xl p-3 mb-4"
+>
+  Enviar Follow-up IA
+</button>
 
                     <div className="space-y-3 max-h-80 overflow-auto">
                       {conversation.history.map((msg, idx) => (
