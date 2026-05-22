@@ -300,10 +300,24 @@ app.post("/api/confirm-appointment", async (req, res) => {
     }
 
     if (existing && existing.length > 0) {
-      return res.status(400).json({
-        error: "Esse horário já está ocupado."
-      });
-    }
+  const occupiedMessage = `Esse horário já está ocupado 😢
+
+Pode me enviar outro dia ou horário que eu verifico para você?`;
+
+  await sendWhatsAppMessage(phone, occupiedMessage);
+
+  await supabase.from("conversations").insert({
+    phone,
+    role: "assistant",
+    content: occupiedMessage,
+    status: "Aguardando Confirmação",
+    customer_name
+  });
+
+  return res.status(400).json({
+    error: "Esse horário já está ocupado. Avisei o cliente no WhatsApp."
+  });
+}
 
     const { error } = await supabase
       .from("appointments")
