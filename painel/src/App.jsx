@@ -10,94 +10,28 @@ const STATUS_OPTIONS = [
   "Perdido"
 ];
 
-function App() {
-  const [session, setSession] = useState(() => {
-    const saved = localStorage.getItem("luna_admin");
-    return saved ? JSON.parse(saved) : null;
-  });
+function login(e) {
+  e.preventDefault();
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const typedEmail = email.trim().toLowerCase();
+  const typedPassword = password.trim();
 
-  function login(e) {
-    e.preventDefault();
+  if (
+    typedEmail === "bruno32@icloud.com" &&
+    typedPassword === "jaftYw-nirke9-dibsab"
+  ) {
+    const adminSession = {
+      user: {
+        email: "bruno32@icloud.com"
+      }
+    };
 
-    if (
-      email === "bruno32@icloud.com" &&
-      password === "jaftYw-nirke9-dibsab"
-    ) {
-      const adminSession = {
-        user: {
-          email: "bruno32@icloud.com"
-        }
-      };
-
-      localStorage.setItem(
-        "luna_admin",
-        JSON.stringify(adminSession)
-      );
-
-      setSession(adminSession);
-
-      return;
-    }
-
-    alert("Email ou senha incorretos");
+    localStorage.setItem("luna_admin", JSON.stringify(adminSession));
+    setSession(adminSession);
+    return;
   }
 
-  function logout() {
-    localStorage.removeItem("luna_admin");
-    setSession(null);
-  }
-
-  if (!session) {
-    return (
-      <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center p-6">
-        <form
-          onSubmit={login}
-          className="bg-zinc-900 border border-zinc-800 rounded-3xl p-8 w-full max-w-md"
-        >
-          <h1 className="text-3xl font-bold">
-            Luna AI
-          </h1>
-
-          <p className="text-zinc-400 mt-2 mb-8">
-            Login do painel admin
-          </p>
-
-          <input
-            className="w-full bg-zinc-800 rounded-xl p-4 mb-4 outline-none"
-            placeholder="Email"
-            value={email}
-            onChange={(e) =>
-              setEmail(e.target.value)
-            }
-          />
-
-          <input
-            className="w-full bg-zinc-800 rounded-xl p-4 mb-6 outline-none"
-            placeholder="Senha"
-            type="password"
-            value={password}
-            onChange={(e) =>
-              setPassword(e.target.value)
-            }
-          />
-
-          <button className="w-full bg-white text-black rounded-xl p-4 font-bold">
-            Entrar
-          </button>
-        </form>
-      </div>
-    );
-  }
-
-  return (
-    <Dashboard
-      logout={logout}
-      user={session.user}
-    />
-  );
+  alert(`Email ou senha incorretos: ${typedEmail}`);
 }
 
 function Dashboard({ logout, user }) {
