@@ -23,6 +23,8 @@ const STATUS_OPTIONS = [
   "Perdido"
 ];
 
+const COLORS = ["#8b5cf6", "#22c55e", "#3b82f6", "#f59e0b", "#ef4444"];
+
 function playBeep() {
   try {
     const audio = new AudioContext();
@@ -53,16 +55,16 @@ function playBeep() {
 function formatTime(date) {
   if (!date) return "agora";
 
-  return new Date(date).toLocaleTimeString("pt-BR", {
+  return new Date(date).toLocaleTimeString("pt-PT", {
     hour: "2-digit",
     minute: "2-digit"
   });
 }
 
 function formatMoney(value) {
-  return Number(value || 0).toLocaleString("pt-BR", {
+  return Number(value || 0).toLocaleString("pt-PT", {
     style: "currency",
-    currency: "BRL"
+    currency: "EUR"
   });
 }
 
@@ -73,7 +75,7 @@ function ChartTooltip({ active, payload, label }) {
     <div className="bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 shadow-xl">
       <p className="text-xs text-zinc-400">{label || "Valor"}</p>
       <p className="text-sm font-bold text-white">
-        {payload[0]?.name === "value"
+        {payload[0]?.dataKey === "value"
           ? formatMoney(payload[0]?.value)
           : payload[0]?.value}
       </p>
@@ -111,25 +113,20 @@ function App() {
   const closedLeads = conversations.filter(
     (item) => item.status === "Fechado"
   ).length;
+
   const statusData = STATUS_OPTIONS.map((status) => ({
-  name: status,
-  total: conversations.filter(
-    (item) => (item.status || "Novo Lead") === status
-  ).length
-}));
+    name: status.replace("Aguardando Confirmação", "Confirmação"),
+    total: conversations.filter(
+      (item) => (item.status || "Novo Lead") === status
+    ).length
+  }));
 
-const revenueData = appointments.map((item, index) => ({
-  name: `#${index + 1}`,
-  value: Number(item.price || 0)
-}));
-
-const COLORS = [
-  "#3b82f6",
-  "#22c55e",
-  "#eab308",
-  "#ef4444",
-  "#a855f7"
-];
+  const revenueData = appointments
+    .map((item, index) => ({
+      name: item.customer_name || `Agendamento ${index + 1}`,
+      value: Number(item.price || 0)
+    }))
+    .filter((item) => item.value > 0);
 
   function addToast(message) {
     const id = Date.now();
@@ -240,7 +237,7 @@ const COLORS = [
   async function confirmAppointment(conversation) {
     const service = prompt("Serviço:", "Piercing") || "Serviço não informado";
     const appointmentDate = prompt("Data e hora:", "25/05 15:00") || "";
-    const price = prompt("Valor do serviço:", "50") || "0";
+    const price = prompt("Valor do serviço em euro:", "50") || "0";
 
     if (!appointmentDate) return;
 
@@ -328,23 +325,23 @@ const COLORS = [
 
   if (!session) {
     return (
-      <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center p-6">
+      <div className="min-h-screen bg-black text-white flex items-center justify-center p-6">
         <form
           onSubmit={login}
-          className="bg-zinc-900 p-8 rounded-2xl w-full max-w-sm border border-zinc-800"
+          className="bg-zinc-900/80 p-8 rounded-3xl w-full max-w-sm border border-zinc-800 shadow-2xl"
         >
           <h1 className="text-3xl font-bold mb-2">Luna AI</h1>
           <p className="text-zinc-400 text-sm mb-6">Painel administrativo</p>
 
           <input
-            className="w-full bg-zinc-800 p-3 rounded-xl mb-3"
+            className="w-full bg-zinc-800 p-3 rounded-xl mb-3 outline-none"
             placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
 
           <input
-            className="w-full bg-zinc-800 p-3 rounded-xl mb-4"
+            className="w-full bg-zinc-800 p-3 rounded-xl mb-4 outline-none"
             placeholder="Senha"
             type="password"
             value={password}
@@ -370,7 +367,7 @@ const COLORS = [
 
   return (
     <div
-      className="min-h-screen bg-zinc-950 text-white p-4"
+      className="min-h-screen bg-black text-white p-4"
       onClick={() => {
         hasInteractedRef.current = true;
       }}
@@ -378,15 +375,15 @@ const COLORS = [
       <ToastArea toasts={toasts} />
 
       <div className="max-w-[1900px] mx-auto">
-        <div className="flex justify-between items-center mb-4">
+        <div className="flex justify-between items-center mb-5">
           <div>
-            <h1 className="text-3xl font-bold">Luna AI CRM</h1>
-            <p className="text-zinc-400 text-sm">{session.user.email}</p>
+            <h1 className="text-4xl font-bold tracking-tight">Luna AI CRM</h1>
+            <p className="text-zinc-400 text-sm mt-1">{session.user.email}</p>
           </div>
 
           <button
             onClick={logout}
-            className="bg-red-500/20 text-red-400 px-4 py-2 rounded-xl text-sm"
+            className="bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 px-4 py-2 rounded-xl text-sm"
           >
             Sair
           </button>
@@ -396,83 +393,67 @@ const COLORS = [
           <FinanceCard
             title="Faturamento"
             value={formatMoney(totalRevenue)}
+            color="border-purple-500/40 shadow-purple-500/10"
           />
 
           <FinanceCard
             title="Agendamentos"
             value={appointments.length}
+            color="border-green-500/40 shadow-green-500/10"
           />
 
           <FinanceCard
             title="Ticket Médio"
             value={formatMoney(averageTicket)}
+            color="border-blue-500/40 shadow-blue-500/10"
           />
 
           <FinanceCard
             title="Fechados"
             value={closedLeads}
+            color="border-yellow-500/40 shadow-yellow-500/10"
           />
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-          <FinanceCard
-            title="Faturamento"
-            value={formatMoney(totalRevenue)}
-          />
-          <FinanceCard title="Agendamentos" value={appointments.length} />
-          <FinanceCard
-            title="Ticket Médio"
-            value={formatMoney(averageTicket)}
-          />
-          <FinanceCard title="Fechados" value={closedLeads} />
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mb-4">
+          <DashboardChart title="Leads por Status">
+            <ResponsiveContainer width="100%" height={230}>
+              <BarChart data={statusData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
+                <XAxis dataKey="name" tick={{ fill: "#a1a1aa", fontSize: 10 }} />
+                <YAxis tick={{ fill: "#a1a1aa", fontSize: 10 }} />
+                <Tooltip content={<ChartTooltip />} />
+                <Bar dataKey="total" fill="#8b5cf6" radius={[8, 8, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </DashboardChart>
+
+          <DashboardChart title="Faturamento">
+            {revenueData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={230}>
+                <PieChart>
+                  <Pie
+                    data={revenueData}
+                    dataKey="value"
+                    nameKey="name"
+                    outerRadius={85}
+                    innerRadius={45}
+                    paddingAngle={4}
+                  >
+                    {revenueData.map((entry, index) => (
+                      <Cell key={index} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<ChartTooltip />} />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[230px] flex items-center justify-center text-zinc-500 text-sm">
+                Nenhum valor registrado ainda
+              </div>
+            )}
+          </DashboardChart>
         </div>
-
-<div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mb-4">
-  <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 h-[320px]">
-    <div className="flex justify-between items-center mb-4">
-      <h2 className="font-bold">Leads por Status</h2>
-    </div>
-
-    <ResponsiveContainer width="100%" height="100%">
-      <BarChart data={statusData}>
-        <XAxis
-          dataKey="name"
-          tick={{ fill: "#a1a1aa", fontSize: 10 }}
-        />
-
-        <Tooltip />
-
-        <Bar dataKey="total" radius={[8, 8, 0, 0]} />
-      </BarChart>
-    </ResponsiveContainer>
-  </div>
-
-  <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 h-[320px]">
-    <div className="flex justify-between items-center mb-4">
-      <h2 className="font-bold">Faturamento</h2>
-    </div>
-
-    <ResponsiveContainer width="100%" height="100%">
-      <PieChart>
-        <Pie
-          data={revenueData}
-          dataKey="value"
-          outerRadius={100}
-          label
-        >
-          {revenueData.map((entry, index) => (
-            <Cell
-              key={index}
-              fill={COLORS[index % COLORS.length]}
-            />
-          ))}
-        </Pie>
-
-        <Tooltip />
-      </PieChart>
-    </ResponsiveContainer>
-  </div>
-</div>
 
         <DragDropContext onDragEnd={handleDragEnd}>
           <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-4">
@@ -518,13 +499,13 @@ function Column({
         <div
           ref={provided.innerRef}
           {...provided.droppableProps}
-          className={`bg-zinc-900 border rounded-2xl p-3 h-[660px] overflow-y-auto transition ${
+          className={`bg-zinc-900/80 border rounded-2xl p-3 h-[660px] overflow-y-auto transition ${
             snapshot.isDraggingOver
-              ? "border-blue-500 bg-blue-500/10"
+              ? "border-purple-500 bg-purple-500/10"
               : "border-zinc-800"
           }`}
         >
-          <div className="flex justify-between items-center mb-3 sticky top-0 bg-zinc-900 pb-2 z-10">
+          <div className="flex justify-between items-center mb-3 sticky top-0 bg-zinc-900/95 pb-2 z-10">
             <h2 className="text-base font-bold">{status}</h2>
             <span className="bg-zinc-800 px-2 py-1 rounded-lg text-xs">
               {filtered.length}
@@ -542,9 +523,9 @@ function Column({
                   <div
                     ref={provided.innerRef}
                     {...provided.draggableProps}
-                    className={`bg-zinc-800 rounded-2xl p-3 transition ${
+                    className={`bg-zinc-800/90 rounded-2xl p-3 transition ${
                       snapshot.isDragging
-                        ? "ring-2 ring-blue-500 scale-[1.02]"
+                        ? "ring-2 ring-purple-500 scale-[1.02]"
                         : ""
                     }`}
                   >
@@ -562,7 +543,7 @@ function Column({
                     </div>
 
                     <input
-                      className="w-full bg-zinc-900 rounded-lg p-2 mb-2 text-xs"
+                      className="w-full bg-zinc-900 rounded-lg p-2 mb-2 text-xs outline-none"
                       placeholder="Nome"
                       defaultValue={conversation.customer_name || ""}
                       onBlur={(e) =>
@@ -575,7 +556,7 @@ function Column({
                     />
 
                     <textarea
-                      className="w-full bg-zinc-900 rounded-lg p-2 mb-2 text-xs h-12"
+                      className="w-full bg-zinc-900 rounded-lg p-2 mb-2 text-xs h-12 outline-none"
                       placeholder="Observações"
                       defaultValue={conversation.notes || ""}
                       onBlur={(e) =>
@@ -588,7 +569,7 @@ function Column({
                     />
 
                     <select
-                      className="w-full bg-zinc-900 rounded-lg p-2 mb-2 text-xs"
+                      className="w-full bg-zinc-900 rounded-lg p-2 mb-2 text-xs outline-none"
                       value={conversation.status || "Novo Lead"}
                       onChange={(e) =>
                         updateStatus(conversation.phone, e.target.value)
@@ -631,7 +612,7 @@ function Column({
 
                     <div className="mt-2 flex gap-2">
                       <input
-                        className="flex-1 bg-zinc-900 rounded-lg p-2 text-xs"
+                        className="flex-1 bg-zinc-900 rounded-lg p-2 text-xs outline-none"
                         placeholder="Responder..."
                         value={replyMessage[conversation.phone] || ""}
                         onChange={(e) =>
@@ -669,8 +650,8 @@ function Column({
 
 function Appointments({ appointments }) {
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-3 h-[660px] overflow-y-auto">
-      <div className="flex justify-between items-center mb-3 sticky top-0 bg-zinc-900 pb-2 z-10">
+    <div className="bg-zinc-900/80 border border-zinc-800 rounded-2xl p-3 h-[660px] overflow-y-auto">
+      <div className="flex justify-between items-center mb-3 sticky top-0 bg-zinc-900/95 pb-2 z-10">
         <h2 className="text-base font-bold">Agendamentos</h2>
         <span className="bg-zinc-800 px-2 py-1 rounded-lg text-xs">
           {appointments.length}
@@ -679,7 +660,7 @@ function Appointments({ appointments }) {
 
       <div className="space-y-3">
         {appointments.map((item) => (
-          <div key={item.id} className="bg-zinc-800 rounded-xl p-3">
+          <div key={item.id} className="bg-zinc-800/90 rounded-xl p-3">
             <p className="font-bold text-sm">
               {item.customer_name || "Cliente"}
             </p>
@@ -734,11 +715,22 @@ function MessageBubble({ msg }) {
   );
 }
 
-function FinanceCard({ title, value }) {
+function FinanceCard({ title, value, color }) {
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4">
+    <div
+      className={`bg-zinc-900/80 border ${color} rounded-3xl p-5 shadow-2xl`}
+    >
       <p className="text-xs text-zinc-400">{title}</p>
-      <p className="text-2xl font-bold mt-2">{value}</p>
+      <p className="text-3xl font-bold mt-2">{value}</p>
+    </div>
+  );
+}
+
+function DashboardChart({ title, children }) {
+  return (
+    <div className="bg-zinc-900/80 border border-zinc-800 rounded-3xl p-5 h-[320px]">
+      <h2 className="font-bold mb-3">{title}</h2>
+      {children}
     </div>
   );
 }
