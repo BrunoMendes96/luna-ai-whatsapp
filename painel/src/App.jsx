@@ -740,6 +740,279 @@ function Column({
   markAsRead
 }) {
   const filtered = conversations
+    .filter((item) => (item.status || "Novo Lead") === status)
+    .filter((item) => {
+      const searchText = search.trim().toLowerCase();
+      if (!searchText) return true;
+
+      const values = [
+        item.phone,
+        item.customer_name,
+        item.profile_name,
+        item.notes,
+        item.summary,
+        getLastMessage(item)
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return values.includes(searchText);
+    })
+    .reverse();
+
+  return (
+    <Droppable droppableId={status}>
+      {(provided) => (
+        <div
+          ref={provided.innerRef}
+          {...provided.droppableProps}
+          className="bg-[#0b1023] border border-zinc-800 rounded-3xl h-[520px] overflow-hidden"
+        >
+          <div className="flex justify-between items-center p-4 border-b border-white/10">
+            <h2 className="font-bold">{status}</h2>
+
+            <span className="bg-white/10 px-2 py-1 rounded-lg text-xs">
+              {filtered.length}
+            </span>
+          </div>
+
+          <div className="h-[450px] overflow-y-auto p-3 space-y-3">
+            {filtered.map((conversation, index) => (
+              <Draggable
+                key={conversation.phone}
+                draggableId={conversation.phone}
+                index={index}
+              >
+                {(provided) => (
+                  <div
+                    ref={provided.innerRef}
+                    {...provided.draggableProps}
+                    className="bg-[#111827] border border-white/10 rounded-2xl p-3"
+                  >
+                    <div
+                      {...provided.dragHandleProps}
+                      className="flex items-center justify-between mb-3 cursor-grab"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Avatar conversation={conversation} />
+
+                        <div>
+                          <p className="font-bold text-sm">
+                            {conversation.customer_name ||
+                              conversation.profile_name ||
+                              "Cliente"}
+                          </p>
+
+                          <p className="text-[10px] text-zinc-400">
+                            {conversation.phone}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+
+                        <span className="bg-purple-500/20 text-purple-300 text-[10px] px-2 py-1 rounded-lg">
+                          {conversation.unread_count || 0}
+                        </span>
+                      </div>
+                    </div>
+
+                    <p className="text-xs text-zinc-400">Última mensagem</p>
+
+                    <p className="text-xs truncate mb-2">
+                      {getLastMessage(conversation)}
+                    </p>
+
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-[10px] px-2 py-1 rounded-full bg-red-500/20 text-red-300">
+                        🔴 Quente
+                      </span>
+
+                      <span className="text-[10px] text-zinc-500">
+                        Alta conversão
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 mb-2">
+                      <button
+                        onClick={() => followUp(conversation.phone)}
+                        className="bg-yellow-500/10 border border-yellow-500/20 text-yellow-300 rounded-lg py-2 text-xs"
+                      >
+                        Follow-up
+                      </button>
+
+                      <button
+                        onClick={() => generateSuggestion(conversation.phone)}
+                        className="bg-purple-500/10 border border-purple-500/20 text-purple-300 rounded-lg py-2 text-xs"
+                      >
+                        IA
+                      </button>
+                    </div>
+
+                    <select
+                      className="w-full bg-[#050816] border border-white/10 rounded-lg p-2 mb-2 text-xs"
+                      value={conversation.status || "Novo Lead"}
+                      onChange={(e) =>
+                        updateStatus(conversation.phone, e.target.value)
+                      }
+                    >
+                      {STATUS_OPTIONS.map((item) => (
+                        <option key={item} value={item}>
+                          {item}
+                        </option>
+                      ))}
+                    </select>
+
+                    <details className="bg-[#050816] border border-white/10 rounded-xl p-2">
+                      <summary className="cursor-pointer text-xs text-purple-300">
+                        Ver acompanhamento completo
+                      </summary>
+
+                      <div className="mt-3">
+                        {conversation.summary && (
+                          <div className="bg-purple-500/10 border border-purple-500/20 rounded-xl p-2 mb-2">
+                            <p className="text-[10px] text-purple-300">
+                              Resumo IA
+                            </p>
+
+                            <p className="text-[11px] text-zinc-300">
+                              {conversation.summary}
+                            </p>
+                          </div>
+                        )}
+
+                        {conversation.ai_suggestion && (
+                          <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-2 mb-2">
+                            <p className="text-[10px] text-blue-300">
+                              Sugestão IA
+                            </p>
+
+                            <p className="text-[11px] text-zinc-300">
+                              {conversation.ai_suggestion}
+                            </p>
+                          </div>
+                        )}
+
+                        <div className="mb-2 bg-[#050816] border border-white/10 rounded-lg p-2">
+                          <p className="text-[10px] text-zinc-400">
+                            Responsável
+                          </p>
+                          <p className="text-xs text-purple-300 font-bold">
+                            Admin
+                          </p>
+                        </div>
+
+                        <input
+                          className="w-full bg-[#050816] border border-white/10 rounded-lg p-2 mb-2 text-xs"
+                          placeholder="Nome"
+                          defaultValue={conversation.customer_name || ""}
+                          onBlur={(e) =>
+                            updateDetails(
+                              conversation.phone,
+                              e.target.value,
+                              conversation.notes || ""
+                            )
+                          }
+                        />
+
+                        <textarea
+                          className="w-full bg-[#050816] border border-white/10 rounded-lg p-2 mb-2 text-xs h-16"
+                          placeholder="Observações"
+                          defaultValue={conversation.notes || ""}
+                          onBlur={(e) =>
+                            updateDetails(
+                              conversation.phone,
+                              conversation.customer_name || "",
+                              e.target.value
+                            )
+                          }
+                        />
+
+                        <input
+                          className="w-full bg-[#050816] border border-white/10 rounded-lg p-2 mb-2 text-xs"
+                          placeholder="Tags"
+                          defaultValue={conversation.tags || ""}
+                          onBlur={(e) =>
+                            updateTags(conversation.phone, e.target.value)
+                          }
+                        />
+
+                        <div className="bg-[#050816] border border-white/10 rounded-xl p-2 mb-2">
+                          <p className="text-[10px] text-zinc-400 mb-2">
+                            Timeline
+                          </p>
+
+                          <div className="space-y-1">
+                            <p className="text-[10px] text-zinc-300">
+                              ✅ Lead criado
+                            </p>
+                            <p className="text-[10px] text-zinc-300">
+                              💬 Cliente respondeu
+                            </p>
+                            <p className="text-[10px] text-zinc-300">
+                              🤖 IA respondeu
+                            </p>
+
+                            {conversation.status === "Fechado" && (
+                              <p className="text-[10px] text-green-400">
+                                💰 Lead fechado
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div
+                          className="h-28 overflow-y-auto border-t border-white/10 pt-2 space-y-2"
+                          onClick={() => markAsRead(conversation.phone)}
+                        >
+                          {conversation.history?.slice(-8).map((msg, index) => (
+                            <MessageBubble key={index} msg={msg} />
+                          ))}
+
+                          {typingUsers[conversation.phone] && (
+                            <div className="text-[10px] text-zinc-500 italic">
+                              digitando...
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="mt-2 flex gap-2">
+                          <input
+                            className="flex-1 bg-[#050816] border border-white/10 rounded-lg p-2 text-xs"
+                            placeholder="Responder..."
+                            value={replyMessage[conversation.phone] || ""}
+                            onChange={(e) =>
+                              setReplyMessage((prev) => ({
+                                ...prev,
+                                [conversation.phone]: e.target.value
+                              }))
+                            }
+                          />
+
+                          <button
+                            onClick={() => sendManualMessage(conversation.phone)}
+                            className="bg-blue-500/20 text-blue-300 px-3 rounded-lg text-xs"
+                          >
+                            Enviar
+                          </button>
+                        </div>
+                      </div>
+                    </details>
+                  </div>
+                )}
+              </Draggable>
+            ))}
+
+            {provided.placeholder}
+          </div>
+        </div>
+      )}
+    </Droppable>
+  );
+}
+  const filtered = conversations
     .filter(
       (item) =>
         (item.status || "Novo Lead") === status
