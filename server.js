@@ -20,7 +20,7 @@ const io = new Server(server, {
 });
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "50mb" }));
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
@@ -34,7 +34,7 @@ const supabase = createClient(
 const processedMessages = new Set();
 
 io.on("connection", (socket) => {
-  console.log("Painel conectado em tempo real:", socket.id);
+  console.log("Painel conectado:", socket.id);
 
   socket.emit("connected", {
     success: true
@@ -50,81 +50,7 @@ function emitRealtime(event, data) {
 }
 
 app.get("/", (req, res) => {
-  res.send("Super Agente online com realtime");
-});
-
-app.get("/api/conversations", async (req, res) => {
-  const { data, error } = await supabase
-    .from("conversations")
-    .select("*")
-    .order("created_at", { ascending: true });
-
-  if (error) {
-    return res.status(500).json({
-      error: error.message
-    });
-  }
-
-  const grouped = {};
-
-  data.forEach((item) => {
-    if (!grouped[item.phone]) {
-      grouped[item.phone] = {
-        phone: item.phone,
-        status: item.status || "Novo Lead",
-        customer_name: item.customer_name || "",
-        notes: item.notes || "",
-        profile_name: item.profile_name || "",
-        profile_picture: item.profile_picture || "",
-        summary: item.summary || "",
-        history: []
-      };
-    }
-
-    grouped[item.phone].history.push({
-      role: item.role,
-      content: item.content,
-      created_at: item.created_at,
-      type: item.type || "text",
-      media_url: item.media_url || ""
-    });
-  });
-
-  res.json(Object.values(grouped));
-});
-
-app.post("/api/conversations/status", async (req, res) => {
-  const { phone, status } = req.body;
-
-  await supabase
-    .from("conversations")
-    .update({ status })
-    .eq("phone", phone);
-
-  emitRealtime("conversation_updated", {
-    phone,
-    status
-  });
-
-  res.json({ success: true });
-});
-
-app.post("/api/conversations/details", async (req, res) => {
-  const { phone, customer_name, notes } = req.body;
-
-  await supabase
-    .from("conversations")
-    .update({
-      customer_name,
-      notes
-    })
-    .eq("phone", phone);
-
-  emitRealtime("conversation_updated", {
-    phone
-  });
-
-  res.json({ success: true });
+  res.send("Luna AI Enterprise online");
 });
 
 function detectAppointment(text) {
@@ -176,8 +102,13 @@ async function saveMessage(phone, role, content, extra = {}) {
       content,
       type: extra.type || "text",
       media_url: extra.media_url || "",
+      media_mime_type: extra.media_mime_type || "",
+      media_filename: extra.media_filename || "",
       profile_name: extra.profile_name || "",
-      profile_picture: extra.profile_picture || ""
+      profile_picture: extra.profile_picture || "",
+      tags: extra.tags || "",
+      ai_suggestion: extra.ai_suggestion || "",
+      unread_count: role === "user" ? 1 : 0
     })
     .select()
     .single();
@@ -241,6 +172,41 @@ ${JSON.stringify(history)}
   return summary;
 }
 
+async function generateSuggestion(phone) {
+  const history = await getHistory(phone);
+
+  if (history.length < 2) return "";
+
+  const response = await openai.responses.create({
+    model: "gpt-4.1-mini",
+    input: `
+Você é uma atendente profissional da Luna Studio.
+
+Gere uma sugestão curta de resposta para o atendente enviar ao cliente.
+Não use texto longo.
+
+Histórico:
+${JSON.stringify(history)}
+`
+  });
+
+  const suggestion = response.output_text || "";
+
+  await supabase
+    .from("conversations")
+    .update({
+      ai_suggestion: suggestion
+    })
+    .eq("phone", phone);
+
+  emitRealtime("ai_suggestion", {
+    phone,
+    suggestion
+  });
+
+  return suggestion;
+}
+
 async function sendWhatsAppMessage(to, text) {
   await axios.post(
     `https://graph.facebook.com/v20.0/${process.env.PHONE_NUMBER_ID}/messages`,
@@ -260,6 +226,189 @@ async function sendWhatsAppMessage(to, text) {
     }
   );
 }
+
+async function getWhatsAppMediaUrl(mediaId) {
+  const response = await axios.get(
+    `https://graph.facebook.com/v20.0/${mediaId}`,
+    {
+      headers: {
+        Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`
+      }
+    }
+  );
+
+  return response.data?.url || "";
+}
+
+app.get("/api/media/:mediaId", async (req, res) => {
+  try {
+    const { mediaId } = req.params;
+
+    const mediaUrl = await getWhatsAppMediaUrl(mediaId);
+
+    if (!mediaUrl) {
+      return res.status(404).json({
+        error: "Mídia não encontrada"
+      });
+    }
+
+    const mediaResponse = await axios.get(mediaUrl, {
+      responseType: "arraybuffer",
+      headers: {
+        Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`
+      }
+    });
+
+    res.setHeader(
+      "Content-Type",
+      mediaResponse.headers["content-type"] || "application/octet-stream"
+    );
+
+    res.send(mediaResponse.data);
+  } catch (error) {
+    console.error("ERRO MEDIA:", error.response?.data || error.message);
+
+    res.status(500).json({
+      error: "Erro ao carregar mídia"
+    });
+  }
+});
+
+app.get("/api/conversations", async (req, res) => {
+  const { data, error } = await supabase
+    .from("conversations")
+    .select("*")
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    return res.status(500).json({
+      error: error.message
+    });
+  }
+
+  const grouped = {};
+
+  data.forEach((item) => {
+    if (!grouped[item.phone]) {
+      grouped[item.phone] = {
+        phone: item.phone,
+        status: item.status || "Novo Lead",
+        customer_name: item.customer_name || "",
+        notes: item.notes || "",
+        profile_name: item.profile_name || "",
+        profile_picture: item.profile_picture || "",
+        summary: item.summary || "",
+        tags: item.tags || "",
+        ai_suggestion: item.ai_suggestion || "",
+        unread_count: item.unread_count || 0,
+        history: []
+      };
+    }
+
+    grouped[item.phone].history.push({
+      role: item.role,
+      content: item.content,
+      created_at: item.created_at,
+      type: item.type || "text",
+      media_url: item.media_url || "",
+      media_mime_type: item.media_mime_type || "",
+      media_filename: item.media_filename || ""
+    });
+
+    grouped[item.phone].unread_count += item.unread_count || 0;
+
+    if (item.summary) grouped[item.phone].summary = item.summary;
+    if (item.ai_suggestion) grouped[item.phone].ai_suggestion = item.ai_suggestion;
+    if (item.tags) grouped[item.phone].tags = item.tags;
+  });
+
+  res.json(Object.values(grouped));
+});
+
+app.post("/api/conversations/status", async (req, res) => {
+  const { phone, status } = req.body;
+
+  await supabase
+    .from("conversations")
+    .update({ status })
+    .eq("phone", phone);
+
+  emitRealtime("conversation_updated", {
+    phone,
+    status
+  });
+
+  res.json({ success: true });
+});
+
+app.post("/api/conversations/details", async (req, res) => {
+  const { phone, customer_name, notes } = req.body;
+
+  await supabase
+    .from("conversations")
+    .update({
+      customer_name,
+      notes
+    })
+    .eq("phone", phone);
+
+  emitRealtime("conversation_updated", {
+    phone
+  });
+
+  res.json({ success: true });
+});
+
+app.post("/api/conversations/tags", async (req, res) => {
+  const { phone, tags } = req.body;
+
+  await supabase
+    .from("conversations")
+    .update({
+      tags
+    })
+    .eq("phone", phone);
+
+  emitRealtime("conversation_updated", {
+    phone,
+    tags
+  });
+
+  res.json({ success: true });
+});
+
+app.post("/api/conversations/read", async (req, res) => {
+  const { phone } = req.body;
+
+  await supabase
+    .from("conversations")
+    .update({
+      unread_count: 0
+    })
+    .eq("phone", phone);
+
+  emitRealtime("conversation_updated", {
+    phone
+  });
+
+  res.json({ success: true });
+});
+
+app.post("/api/ai-suggestion", async (req, res) => {
+  try {
+    const { phone } = req.body;
+
+    const suggestion = await generateSuggestion(phone);
+
+    res.json({
+      suggestion
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: error.message
+    });
+  }
+});
 
 app.post("/webhook", async (req, res) => {
   try {
@@ -287,6 +436,8 @@ app.post("/webhook", async (req, res) => {
     let userText = "";
     let messageType = message.type || "text";
     let mediaUrl = "";
+    let mediaMimeType = "";
+    let mediaFilename = "";
 
     if (message.type === "text") {
       userText = message.text.body.trim();
@@ -295,23 +446,25 @@ app.post("/webhook", async (req, res) => {
     if (message.type === "image") {
       userText = "Cliente enviou uma imagem.";
       mediaUrl = message.image?.id || "";
+      mediaMimeType = message.image?.mime_type || "image/jpeg";
     }
 
     if (message.type === "audio") {
       userText = "Cliente enviou um áudio.";
       mediaUrl = message.audio?.id || "";
+      mediaMimeType = message.audio?.mime_type || "audio/ogg";
     }
 
     if (message.type === "document") {
       userText = "Cliente enviou um documento.";
       mediaUrl = message.document?.id || "";
+      mediaMimeType = message.document?.mime_type || "";
+      mediaFilename = message.document?.filename || "documento";
     }
 
     if (!userText) {
       return res.sendStatus(200);
     }
-
-    console.log("Mensagem recebida:", userText);
 
     emitRealtime("typing", {
       phone: from,
@@ -321,6 +474,8 @@ app.post("/webhook", async (req, res) => {
     await saveMessage(from, "user", userText, {
       type: messageType,
       media_url: mediaUrl,
+      media_mime_type: mediaMimeType,
+      media_filename: mediaFilename,
       profile_name: profileName
     });
 
@@ -375,6 +530,7 @@ Vou verificar disponibilidade 💙`;
     await sendWhatsAppMessage(from, reply);
 
     await generateSummary(from);
+    await generateSuggestion(from);
 
     emitRealtime("typing", {
       phone: from,
@@ -383,10 +539,7 @@ Vou verificar disponibilidade 💙`;
 
     return res.sendStatus(200);
   } catch (error) {
-    console.error(
-      "ERRO NO WEBHOOK:",
-      error.response?.data || error.message
-    );
+    console.error("ERRO NO WEBHOOK:", error.response?.data || error.message);
 
     return res.sendStatus(200);
   }
@@ -420,7 +573,6 @@ app.post("/api/confirm-appointment", async (req, res) => {
 Pode me enviar outro dia ou horário que eu verifico para você?`;
 
       await sendWhatsAppMessage(phone, occupiedMessage);
-
       await saveMessage(phone, "assistant", occupiedMessage);
 
       return res.status(400).json({
@@ -449,7 +601,8 @@ Pode me enviar outro dia ou horário que eu verifico para você?`;
       .from("conversations")
       .update({
         status: "Fechado",
-        customer_name
+        customer_name,
+        unread_count: 0
       })
       .eq("phone", phone);
 
@@ -461,7 +614,6 @@ Data/Hora: ${appointment_date}
 Esperamos você 💙`;
 
     await sendWhatsAppMessage(phone, confirmationMessage);
-
     await saveMessage(phone, "assistant", confirmationMessage);
 
     emitRealtime("appointment_confirmed", {
@@ -516,10 +668,9 @@ app.post("/api/send-message", async (req, res) => {
     }
 
     await sendWhatsAppMessage(phone, message);
-
     await saveMessage(phone, "assistant", message);
-
     await generateSummary(phone);
+    await generateSuggestion(phone);
 
     res.json({
       success: true
@@ -537,10 +688,10 @@ app.post("/api/follow-up", async (req, res) => {
   try {
     const { phone } = req.body;
 
-    const message = `Oi 😊 Passando só para saber se ainda posso te ajudar com seu agendamento.`;
+    const message =
+      "Oi 😊 Passando só para saber se ainda posso te ajudar com seu agendamento.";
 
     await sendWhatsAppMessage(phone, message);
-
     await saveMessage(phone, "assistant", message);
 
     res.json({
@@ -556,5 +707,5 @@ app.post("/api/follow-up", async (req, res) => {
 const PORT = process.env.PORT || 3000;
 
 server.listen(PORT, () => {
-  console.log(`Super Agente realtime rodando na porta ${PORT}`);
+  console.log(`Luna AI Enterprise rodando na porta ${PORT}`);
 });
