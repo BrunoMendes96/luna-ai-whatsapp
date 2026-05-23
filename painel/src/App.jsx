@@ -58,7 +58,7 @@ function App() {
 
   const [conversations, setConversations] = useState([]);
   const [appointments, setAppointments] = useState([]);
-  const [replyMessage, setReplyMessage] = useState({});
+  const [selectedConversation, setSelectedConversation] = useState(null);
   const [toasts, setToasts] = useState([]);
 
   const lastMessageCountRef = useRef(0);
@@ -314,7 +314,7 @@ function App() {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-4">
+        <div className="grid grid-cols-1 xl:grid-cols-[420px_1fr] gap-4">
           {STATUS_OPTIONS.map((status) => (
             <Column
               key={status}
@@ -326,8 +326,61 @@ function App() {
               replyMessage={replyMessage}
               setReplyMessage={setReplyMessage}
               sendManualMessage={sendManualMessage}
+              selectedConversation={selectedConversation}
+              setSelectedConversation={setSelectedConversation}
             />
           ))}
+
+<div className="bg-zinc-900 border border-zinc-800 rounded-2xl h-[680px] flex flex-col overflow-hidden">
+  {selectedConversation ? (
+    <>
+      <div className="border-b border-zinc-800 p-4">
+        <h2 className="text-xl font-bold">
+          {selectedConversation.customer_name || "Cliente"}
+        </h2>
+
+        <p className="text-zinc-400 text-sm">
+          {selectedConversation.phone}
+        </p>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        {[...(selectedConversation.history || [])]
+          .reverse()
+          .map((msg, index) => (
+            <MessageBubble key={index} msg={msg} />
+          ))}
+      </div>
+
+      <div className="border-t border-zinc-800 p-4 flex gap-2">
+        <input
+          className="flex-1 bg-zinc-800 rounded-xl p-3 text-sm"
+          placeholder="Responder cliente..."
+          value={replyMessage[selectedConversation.phone] || ""}
+          onChange={(e) =>
+            setReplyMessage((prev) => ({
+              ...prev,
+              [selectedConversation.phone]: e.target.value
+            }))
+          }
+        />
+
+        <button
+          onClick={() =>
+            sendManualMessage(selectedConversation.phone)
+          }
+          className="bg-blue-500/20 text-blue-400 px-5 rounded-xl"
+        >
+          Enviar
+        </button>
+      </div>
+    </>
+  ) : (
+    <div className="flex items-center justify-center h-full text-zinc-500">
+      Selecione uma conversa
+    </div>
+  )}
+</div>
 
           <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 h-[680px] overflow-y-auto">
             <h2 className="text-xl font-bold mb-4">Agendamentos</h2>
@@ -354,6 +407,8 @@ function App() {
 }
 
 function Column({
+  selectedConversation,
+setSelectedConversation,
   status,
   conversations,
   updateStatus,
@@ -378,7 +433,11 @@ function Column({
 
       <div className="space-y-4">
         {filtered.map((conversation) => (
-          <div key={conversation.phone} className="bg-zinc-800 rounded-2xl p-3">
+          <div
+  key={conversation.phone}
+  onClick={() => setSelectedConversation(conversation)}
+  className="bg-zinc-800 rounded-2xl p-3 cursor-pointer hover:bg-zinc-700 transition"
+>
             <div className="flex items-center justify-between mb-3">
               <p className="font-bold text-sm">{conversation.phone}</p>
 
