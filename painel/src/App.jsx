@@ -13,17 +13,27 @@ const STATUS_OPTIONS = [
 function playBeep() {
   try {
     const audio = new AudioContext();
-    const oscillator = audio.createOscillator();
+
+    const oscillator1 = audio.createOscillator();
+    const oscillator2 = audio.createOscillator();
+
     const gain = audio.createGain();
 
-    oscillator.connect(gain);
+    oscillator1.connect(gain);
+    oscillator2.connect(gain);
     gain.connect(audio.destination);
 
-    oscillator.frequency.value = 880;
-    gain.gain.value = 0.08;
+    oscillator1.frequency.value = 880;
+    oscillator2.frequency.value = 1320;
 
-    oscillator.start();
-    oscillator.stop(audio.currentTime + 0.15);
+    gain.gain.setValueAtTime(0.18, audio.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + 0.45);
+
+    oscillator1.start(audio.currentTime);
+    oscillator2.start(audio.currentTime + 0.08);
+
+    oscillator1.stop(audio.currentTime + 0.35);
+    oscillator2.stop(audio.currentTime + 0.45);
   } catch (error) {
     console.log("Som bloqueado:", error.message);
   }
