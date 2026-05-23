@@ -1095,6 +1095,45 @@ function DashboardChart({ title, icon, children }) {
   );
 }
 
+function Appointments({ appointments }) {
+  return (
+    <div className="mt-5 bg-[#0b1023] border border-zinc-800 rounded-2xl p-4">
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="font-bold">Agendamentos</h2>
+
+        <span className="bg-white/10 px-2 py-1 rounded-lg text-xs">
+          {appointments.length}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-3">
+        {appointments.map((item) => (
+          <div
+            key={item.id}
+            className="bg-[#111827] border border-white/10 rounded-xl p-3"
+          >
+            <p className="font-bold text-sm">
+              {item.customer_name || "Cliente"}
+            </p>
+
+            <p className="text-xs text-zinc-400">{item.phone}</p>
+
+            <p className="text-xs mt-2">{item.service}</p>
+
+            <p className="text-xs text-green-400">
+              {item.appointment_date}
+            </p>
+
+            <p className="text-xs text-emerald-400 font-bold">
+              {formatMoney(item.price)}
+            </p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ToastArea({ toasts }) {
   return (
     <div className="fixed top-4 right-4 z-50 space-y-3">
