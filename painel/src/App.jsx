@@ -1,5 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  Tooltip,
+  PieChart,
+  Pie,
+  Cell
+} from "recharts";
 
 const API_URL = "https://luna-ai-whatsapp-production.up.railway.app";
 
@@ -77,6 +87,25 @@ function App() {
   const closedLeads = conversations.filter(
     (item) => item.status === "Fechado"
   ).length;
+  const statusData = STATUS_OPTIONS.map((status) => ({
+  name: status,
+  total: conversations.filter(
+    (item) => (item.status || "Novo Lead") === status
+  ).length
+}));
+
+const revenueData = appointments.map((item, index) => ({
+  name: `#${index + 1}`,
+  value: Number(item.price || 0)
+}));
+
+const COLORS = [
+  "#3b82f6",
+  "#22c55e",
+  "#eab308",
+  "#ef4444",
+  "#a855f7"
+];
 
   function addToast(message) {
     const id = Date.now();
@@ -373,6 +402,53 @@ function App() {
           />
           <FinanceCard title="Fechados" value={closedLeads} />
         </div>
+
+<div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mb-4">
+  <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 h-[320px]">
+    <div className="flex justify-between items-center mb-4">
+      <h2 className="font-bold">Leads por Status</h2>
+    </div>
+
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart data={statusData}>
+        <XAxis
+          dataKey="name"
+          tick={{ fill: "#a1a1aa", fontSize: 10 }}
+        />
+
+        <Tooltip />
+
+        <Bar dataKey="total" radius={[8, 8, 0, 0]} />
+      </BarChart>
+    </ResponsiveContainer>
+  </div>
+
+  <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 h-[320px]">
+    <div className="flex justify-between items-center mb-4">
+      <h2 className="font-bold">Faturamento</h2>
+    </div>
+
+    <ResponsiveContainer width="100%" height="100%">
+      <PieChart>
+        <Pie
+          data={revenueData}
+          dataKey="value"
+          outerRadius={100}
+          label
+        >
+          {revenueData.map((entry, index) => (
+            <Cell
+              key={index}
+              fill={COLORS[index % COLORS.length]}
+            />
+          ))}
+        </Pie>
+
+        <Tooltip />
+      </PieChart>
+    </ResponsiveContainer>
+  </div>
+</div>
 
         <DragDropContext onDragEnd={handleDragEnd}>
           <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-4">
