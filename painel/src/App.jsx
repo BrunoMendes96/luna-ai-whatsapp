@@ -411,7 +411,7 @@ function App() {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
           <FinanceCard
             title="Faturamento"
             value={formatMoney(totalRevenue)}
@@ -826,7 +826,7 @@ function FinanceCard({ title, value, description, icon, color, iconColor }) {
         </div>
 
         <div
-          className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl ${iconColor}`}
+          className={`w-10 h-10 rounded-2xl flex items-center justify-center text-2xl ${iconColor}`}
         >
           {icon}
         </div>
