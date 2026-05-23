@@ -109,6 +109,7 @@ function App() {
   const [appointments, setAppointments] = useState([]);
   const [replyMessage, setReplyMessage] = useState({});
   const [toasts, setToasts] = useState([]);
+  const [search, setSearch] = useState("");
 
   const lastMessageCountRef = useRef(0);
   const hasInteractedRef = useRef(false);
@@ -411,6 +412,29 @@ function App() {
           </button>
         </div>
 
+<div className="mb-5">
+  <input
+    type="text"
+    placeholder="Buscar lead..."
+    value={search}
+    onChange={(e) => setSearch(e.target.value)}
+    className="
+      w-full
+      bg-[#0b1023]
+      border
+      border-zinc-800
+      rounded-2xl
+      px-4
+      py-3
+      text-sm
+      outline-none
+      focus:border-purple-500
+    "
+  />
+</div>
+
+<div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4"></div>
+
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
           <FinanceCard
             title="Faturamento"
@@ -547,6 +571,7 @@ function App() {
                 replyMessage={replyMessage}
                 setReplyMessage={setReplyMessage}
                 sendManualMessage={sendManualMessage}
+                search={search}
               />
             ))}
           </div>
@@ -566,11 +591,21 @@ function Column({
   confirmAppointment,
   replyMessage,
   setReplyMessage,
-  sendManualMessage
+  sendManualMessage,
+  search
 }) {
   const filtered = conversations
-    .filter((item) => (item.status || "Novo Lead") === status)
-    .reverse();
+  .filter((item) => (item.status || "Novo Lead") === status)
+  .filter((item) => {
+    const text = `
+      ${item.phone}
+      ${item.customer_name || ""}
+      ${item.notes || ""}
+    `.toLowerCase();
+
+    return text.includes(search.toLowerCase());
+  })
+  .reverse();
 
   return (
     <Droppable droppableId={status}>
@@ -624,13 +659,15 @@ function Column({
                       {...provided.dragHandleProps}
                       className="flex items-center justify-between mb-2 cursor-grab active:cursor-grabbing"
                     >
-                      <p className="font-bold text-sm">{conversation.phone}</p>
+                      
 
-                      {(conversation.status || "Novo Lead") === "Novo Lead" && (
-                        <span className="bg-purple-500/30 text-purple-200 text-[10px] px-2 py-1 rounded-lg">
-                          Novo
-                        </span>
-                      )}
+                     <div className="flex items-center gap-2">
+  <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+
+  <span className="bg-purple-500/30 text-purple-200 text-[10px] px-2 py-1 rounded-lg">
+    {conversation.history?.length || 0}
+  </span>
+</div>
                     </div>
 
                     <input
@@ -692,6 +729,18 @@ function Column({
                         </button>
                       </div>
                     )}
+
+<div className="mb-2">
+  <p className="text-xs text-zinc-400 truncate">
+    Última mensagem:
+  </p>
+
+  <p className="text-xs text-white truncate">
+    {conversation.history?.[
+      conversation.history.length - 1
+    ]?.content || "Sem mensagens"}
+  </p>
+</div>
 
                     <div className="h-36 overflow-y-auto space-y-2 pr-1 border-t border-white/10 pt-2">
                       {[...(conversation.history || [])]
