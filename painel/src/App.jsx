@@ -76,6 +76,101 @@ function formatMoney(value) {
   });
 }
 
+function getClientName(conversation) {
+  return conversation.customer_name || "Cliente";
+}
+
+function getInitials(name) {
+  return (name || "Cliente")
+    .trim()
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+}
+
+function getLastMessage(conversation) {
+  const history = conversation.history || [];
+  return history[history.length - 1];
+}
+
+function getLastMessageText(conversation) {
+  return getLastMessage(conversation)?.content || "Sem mensagens ainda";
+}
+
+function isRecentlyActive(conversation) {
+  const lastMessage = getLastMessage(conversation);
+
+  if (!lastMessage?.created_at) {
+    return (conversation.history || []).length > 0;
+  }
+
+  const lastTime = new Date(lastMessage.created_at).getTime();
+  const diffMinutes = (Date.now() - lastTime) / 1000 / 60;
+
+  return diffMinutes <= 30;
+}
+
+function isWaitingForAI(conversation) {
+  const lastMessage = getLastMessage(conversation);
+  return lastMessage?.role === "user";
+}
+
+function getConversationSummary(conversation) {
+  const history = conversation.history || [];
+  const lastMessages = history
+    .slice(-4)
+    .map((msg) => msg.content)
+    .join(" ");
+
+  if (!lastMessages) return "Sem histórico suficiente.";
+
+  if (/agend|marcar|hor[aá]rio|dia|confirm/i.test(lastMessages)) {
+    return "Cliente com intenção de agendamento.";
+  }
+
+  if (/pre[cç]o|valor|quanto|custa/i.test(lastMessages)) {
+    return "Cliente perguntando sobre valores.";
+  }
+
+  if (/piercing/i.test(lastMessages)) {
+    return "Interesse em piercing.";
+  }
+
+  if (/tattoo|tatuagem/i.test(lastMessages)) {
+    return "Interesse em tattoo.";
+  }
+
+  if (/est[eé]tica/i.test(lastMessages)) {
+    return "Interesse em estética.";
+  }
+
+  return "Conversa em atendimento.";
+}
+
+function getFollowUpSuggestion(conversation) {
+  const status = conversation.status || "Novo Lead";
+
+  if (status === "Novo Lead") {
+    return "Responder rápido e puxar para agendamento.";
+  }
+
+  if (status === "Aguardando Confirmação") {
+    return "Confirmar disponibilidade ou sugerir outro horário.";
+  }
+
+  if (status === "Em Atendimento") {
+    return "Tirar dúvida e pedir melhor dia/horário.";
+  }
+
+  if (status === "Fechado") {
+    return "Enviar lembrete antes do horário.";
+  }
+
+  return "Reativar com mensagem curta e educada.";
+}
+
 function ChartTooltip({ active, payload, label }) {
   if (!active || !payload || payload.length === 0) return null;
 
@@ -83,7 +178,10 @@ function ChartTooltip({ active, payload, label }) {
 
   return (
     <div className="bg-[#050816] border border-zinc-700 rounded-xl px-3 py-2 shadow-2xl">
-      <p className="text-xs text-zinc-400">{label || current?.name || "Valor"}</p>
+      <p className="text-xs text-zinc-400">
+        {label || current?.name || "Valor"}
+      </p>
+
       <p className="text-sm font-bold text-white">
         {current?.dataKey === "value"
           ? formatMoney(current?.value)
@@ -389,7 +487,7 @@ function App() {
       <ToastArea toasts={toasts} />
 
       <div className="max-w-[1900px] mx-auto">
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex justify-between items-center mb-5">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center shadow-lg shadow-purple-500/20">
               <span className="text-2xl">☾</span>
@@ -412,28 +510,15 @@ function App() {
           </button>
         </div>
 
-<div className="mb-5">
-  <input
-    type="text"
-    placeholder="Buscar lead..."
-    value={search}
-    onChange={(e) => setSearch(e.target.value)}
-    className="
-      w-full
-      bg-[#0b1023]
-      border
-      border-zinc-800
-      rounded-2xl
-      px-4
-      py-3
-      text-sm
-      outline-none
-      focus:border-purple-500
-    "
-  />
-</div>
-
-<div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4"></div>
+        <div className="mb-5">
+          <input
+            type="text"
+            placeholder="Buscar lead por nome, telefone ou observação..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full bg-[#0b1023] border border-zinc-800 rounded-2xl px-4 py-3 text-sm outline-none focus:border-purple-500"
+          />
+        </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
           <FinanceCard
@@ -595,17 +680,18 @@ function Column({
   search
 }) {
   const filtered = conversations
-  .filter((item) => (item.status || "Novo Lead") === status)
-  .filter((item) => {
-    const text = `
-      ${item.phone}
-      ${item.customer_name || ""}
-      ${item.notes || ""}
-    `.toLowerCase();
+    .filter((item) => (item.status || "Novo Lead") === status)
+    .filter((item) => {
+      const text = `
+        ${item.phone}
+        ${item.customer_name || ""}
+        ${item.notes || ""}
+        ${getLastMessageText(item)}
+      `.toLowerCase();
 
-    return text.includes(search.toLowerCase());
-  })
-  .reverse();
+      return text.includes(search.toLowerCase());
+    })
+    .reverse();
 
   return (
     <Droppable droppableId={status}>
@@ -613,7 +699,7 @@ function Column({
         <div
           ref={provided.innerRef}
           {...provided.droppableProps}
-          className={`bg-[#0b1023] border rounded-3xl h-[300px] overflow-hidden shadow-2xl ${
+          className={`bg-[#0b1023] border rounded-3xl h-[430px] overflow-hidden shadow-2xl ${
             snapshot.isDraggingOver
               ? "border-purple-500 bg-purple-500/10"
               : COLUMN_COLORS[status]
@@ -630,7 +716,7 @@ function Column({
             <span className="text-xl text-zinc-300">+</span>
           </div>
 
-          <div className="h-[215px] overflow-y-auto p-3 space-y-3">
+          <div className="h-[345px] overflow-y-auto p-3 space-y-3">
             {filtered.length === 0 && (
               <div className="h-full flex flex-col items-center justify-center text-center text-zinc-500">
                 <div className="text-3xl mb-3">▱</div>
@@ -657,17 +743,45 @@ function Column({
                   >
                     <div
                       {...provided.dragHandleProps}
-                      className="flex items-center justify-between mb-2 cursor-grab active:cursor-grabbing"
+                      className="flex items-center justify-between mb-3 cursor-grab active:cursor-grabbing"
                     >
-                      
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="relative shrink-0">
+                          <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-xs font-black shadow-lg shadow-purple-500/20">
+                            {getInitials(getClientName(conversation))}
+                          </div>
 
-                     <div className="flex items-center gap-2">
-  <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                          <span
+                            className={`absolute -right-0.5 -bottom-0.5 w-3 h-3 rounded-full border-2 border-[#111827] ${
+                              isRecentlyActive(conversation)
+                                ? "bg-green-400 animate-pulse"
+                                : "bg-zinc-500"
+                            }`}
+                          />
+                        </div>
 
-  <span className="bg-purple-500/30 text-purple-200 text-[10px] px-2 py-1 rounded-lg">
-    {conversation.history?.length || 0}
-  </span>
-</div>
+                        <div className="min-w-0">
+                          <p className="font-bold text-sm truncate">
+                            {getClientName(conversation)}
+                          </p>
+
+                          <p className="text-[10px] text-zinc-400 truncate">
+                            {conversation.phone}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        {isWaitingForAI(conversation) && (
+                          <span className="bg-blue-500/20 text-blue-300 text-[10px] px-2 py-1 rounded-lg">
+                            IA...
+                          </span>
+                        )}
+
+                        <span className="bg-purple-500/30 text-purple-200 text-[10px] px-2 py-1 rounded-lg">
+                          {conversation.history?.length || 0}
+                        </span>
+                      </div>
                     </div>
 
                     <input
@@ -730,19 +844,45 @@ function Column({
                       </div>
                     )}
 
-<div className="mb-2">
-  <p className="text-xs text-zinc-400 truncate">
-    Última mensagem:
-  </p>
+                    <div className="mb-2 rounded-xl bg-[#050816]/80 border border-white/10 p-2">
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <p className="text-[10px] text-zinc-400">
+                          Última mensagem
+                        </p>
 
-  <p className="text-xs text-white truncate">
-    {conversation.history?.[
-      conversation.history.length - 1
-    ]?.content || "Sem mensagens"}
-  </p>
-</div>
+                        <p className="text-[10px] text-zinc-500">
+                          {formatTime(getLastMessage(conversation)?.created_at)}
+                        </p>
+                      </div>
 
-                    <div className="h-36 overflow-y-auto space-y-2 pr-1 border-t border-white/10 pt-2">
+                      <p className="text-xs text-white truncate">
+                        {getLastMessageText(conversation)}
+                      </p>
+                    </div>
+
+                    <div className="mb-2 grid grid-cols-1 gap-2">
+                      <div className="rounded-xl bg-purple-500/10 border border-purple-500/20 p-2">
+                        <p className="text-[10px] text-purple-300 font-bold mb-1">
+                          Resumo IA
+                        </p>
+
+                        <p className="text-[11px] text-zinc-300">
+                          {getConversationSummary(conversation)}
+                        </p>
+                      </div>
+
+                      <div className="rounded-xl bg-blue-500/10 border border-blue-500/20 p-2">
+                        <p className="text-[10px] text-blue-300 font-bold mb-1">
+                          Follow-up
+                        </p>
+
+                        <p className="text-[11px] text-zinc-300">
+                          {getFollowUpSuggestion(conversation)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="h-28 overflow-y-auto space-y-2 pr-1 border-t border-white/10 pt-2">
                       {[...(conversation.history || [])]
                         .reverse()
                         .map((msg, index) => (
@@ -805,7 +945,10 @@ function Appointments({ appointments }) {
 
       <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-3">
         {appointments.map((item) => (
-          <div key={item.id} className="bg-[#111827] rounded-xl p-3 border border-white/10">
+          <div
+            key={item.id}
+            className="bg-[#111827] rounded-xl p-3 border border-white/10"
+          >
             <p className="font-bold text-sm">
               {item.customer_name || "Cliente"}
             </p>
