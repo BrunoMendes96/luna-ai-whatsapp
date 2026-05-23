@@ -340,7 +340,7 @@ function App() {
           onSubmit={login}
           className="bg-[#0b1023] p-8 rounded-3xl w-full max-w-sm border border-zinc-800 shadow-2xl"
         >
-          <h1 className="text-3xl font-black mb-2 bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
+          <h1 className="text-2xl font-black mb-2 bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
             Luna AI
           </h1>
 
@@ -380,7 +380,7 @@ function App() {
 
   return (
     <div
-      className="min-h-screen bg-[#050816] text-white p-6"
+      className="min-h-screen bg-[#050816] text-white p-4"
       onClick={() => {
         hasInteractedRef.current = true;
       }}
@@ -395,7 +395,7 @@ function App() {
             </div>
 
             <div>
-              <h1 className="text-4xl font-black tracking-tight bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
+              <h1 className="text-2xl font-black tracking-tight bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
                 Luna AI CRM
               </h1>
 
@@ -451,7 +451,7 @@ function App() {
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 mb-6">
           <DashboardChart title="Leads por Status" icon="▮">
-            <ResponsiveContainer width="100%" height={235}>
+            <ResponsiveContainer width="100%" height={180}>
               <BarChart
                 data={statusData}
                 margin={{ top: 10, right: 15, left: -20, bottom: 0 }}
@@ -481,7 +481,7 @@ function App() {
           <DashboardChart title="Faturamento por Agendamento" icon="◕">
             {revenueData.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
-                <ResponsiveContainer width="100%" height={235}>
+                <ResponsiveContainer width="100%" height={180}>
                   <PieChart>
                     <Pie
                       data={revenueData}
@@ -527,7 +527,7 @@ function App() {
                 </div>
               </div>
             ) : (
-              <div className="h-[235px] flex items-center justify-center text-zinc-500 text-sm">
+              <div className="h-[180px] flex items-center justify-center text-zinc-500 text-sm">
                 Nenhum valor registrado ainda
               </div>
             )}
@@ -578,7 +578,7 @@ function Column({
         <div
           ref={provided.innerRef}
           {...provided.droppableProps}
-          className={`bg-[#0b1023] border rounded-3xl h-[360px] overflow-hidden shadow-2xl ${
+          className={`bg-[#0b1023] border rounded-3xl h-[300px] overflow-hidden shadow-2xl ${
             snapshot.isDraggingOver
               ? "border-purple-500 bg-purple-500/10"
               : COLUMN_COLORS[status]
@@ -595,10 +595,10 @@ function Column({
             <span className="text-xl text-zinc-300">+</span>
           </div>
 
-          <div className="h-[270px] overflow-y-auto p-3 space-y-3">
+          <div className="h-[215px] overflow-y-auto p-3 space-y-3">
             {filtered.length === 0 && (
               <div className="h-full flex flex-col items-center justify-center text-center text-zinc-500">
-                <div className="text-4xl mb-3">▱</div>
+                <div className="text-3xl mb-3">▱</div>
                 <p className="font-bold text-sm">Nenhum lead</p>
                 <p className="text-xs mt-1">Arraste leads para esta etapa</p>
               </div>
@@ -745,7 +745,7 @@ function Column({
 
 function Appointments({ appointments }) {
   return (
-    <div className="mt-5 bg-[#0b1023] border border-zinc-800 rounded-3xl p-4 shadow-2xl">
+    <div className="mt-5 bg-[#0b1023] border border-zinc-800 rounded-2xl p-4 shadow-2xl">
       <div className="flex justify-between items-center mb-3">
         <h2 className="font-bold">Agendamentos Confirmados</h2>
 
@@ -814,19 +814,19 @@ function MessageBubble({ msg }) {
 function FinanceCard({ title, value, description, icon, color, iconColor }) {
   return (
     <div
-      className={`relative overflow-hidden bg-[#0b1023] border ${color} rounded-3xl p-5 shadow-2xl`}
+      className={`relative overflow-hidden bg-[#0b1023] border ${color} rounded-2xl p-4 shadow-2xl`}
     >
       <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-20" />
 
       <div className="relative z-10 flex items-center justify-between">
         <div>
           <p className="text-sm text-zinc-300 mb-2">{title}</p>
-          <p className="text-3xl font-black">{value}</p>
+          <p className="text-2xl font-black">{value}</p>
           <p className="text-sm text-zinc-400 mt-3">{description}</p>
         </div>
 
         <div
-          className={`w-14 h-14 rounded-2xl flex items-center justify-center text-3xl ${iconColor}`}
+          className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl ${iconColor}`}
         >
           {icon}
         </div>
@@ -837,7 +837,7 @@ function FinanceCard({ title, value, description, icon, color, iconColor }) {
 
 function DashboardChart({ title, icon, children }) {
   return (
-    <div className="bg-[#0b1023] border border-zinc-800 rounded-3xl p-5 h-[330px] shadow-2xl">
+    <div className="bg-[#0b1023] border border-zinc-800 rounded-2xl p-4 h-[260px] shadow-2xl">
       <div className="flex items-center gap-2 mb-4">
         <span className="text-purple-400">{icon}</span>
         <h2 className="font-bold text-xl">{title}</h2>
