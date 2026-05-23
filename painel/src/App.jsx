@@ -934,6 +934,22 @@ function Column({
                         </button>
                       </div>
 
+<div className="bg-[#050816] border border-white/10 rounded-xl p-2 mb-2">
+  <p className="text-[10px] text-zinc-400 mb-2">
+    Timeline
+  </p>
+
+  <div className="space-y-1">
+    <p className="text-[10px] text-zinc-300">✅ Lead criado</p>
+    <p className="text-[10px] text-zinc-300">💬 Cliente respondeu</p>
+    <p className="text-[10px] text-zinc-300">🤖 IA respondeu</p>
+
+    {conversation.status === "Fechado" && (
+      <p className="text-[10px] text-green-400">💰 Lead fechado</p>
+    )}
+  </div>
+</div>
+
                       <div
                         className="h-24 overflow-y-auto border-t border-white/10 pt-2 space-y-2"
                         onClick={() =>
