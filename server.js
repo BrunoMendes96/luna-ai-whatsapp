@@ -393,6 +393,32 @@ app.get("/api/appointments", async (req, res) => {
   }
 });
 
+app.post("/api/send-message", async (req, res) => {
+  try {
+    const { phone, message } = req.body;
+
+    if (!phone || !message) {
+      return res.status(400).json({
+        error: "Telefone e mensagem são obrigatórios"
+      });
+    }
+
+    await sendWhatsAppMessage(phone, message);
+
+    await saveMessage(phone, "assistant", message);
+
+    res.json({
+      success: true
+    });
+  } catch (error) {
+    console.error("ERRO ENVIAR MANUAL:", error.message);
+
+    res.status(500).json({
+      error: error.message
+    });
+  }
+});
+
 app.listen(
   process.env.PORT || 3000,
   () => {

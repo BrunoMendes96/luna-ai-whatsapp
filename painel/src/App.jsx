@@ -28,6 +28,7 @@ function App() {
 
   const [conversations, setConversations] = useState([]);
   const [appointments, setAppointments] = useState([]);
+  const [replyMessage, setReplyMessage] = useState({});
   const lastMessageCountRef = useRef(0);
   const hasInteractedRef = useRef(false);
 
@@ -130,6 +131,33 @@ function App() {
   }
 
   async function confirmAppointment(conversation) {
+    async function sendManualMessage(phone) {
+  const message = replyMessage[phone];
+
+  if (!message?.trim()) return;
+
+  try {
+    await fetch(`${API_URL}/api/send-message`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        phone,
+        message
+      })
+    });
+
+    setReplyMessage((prev) => ({
+      ...prev,
+      [phone]: ""
+    }));
+
+    await loadConversations();
+  } catch (error) {
+    alert(error.message);
+  }
+}
     const service = prompt("Serviço:", "Piercing") || "Serviço não informado";
     const appointmentDate = prompt("Data e hora:", "25/05 15:00") || "";
 
@@ -366,6 +394,26 @@ function Column({
             )}
 
             <div className="h-64 overflow-y-auto space-y-2 pr-1 border-t border-zinc-700 pt-3">
+              <div className="mt-3 flex gap-2">
+  <input
+    className="flex-1 bg-zinc-900 rounded-lg p-2 text-sm"
+    placeholder="Responder cliente..."
+    value={replyMessage[conversation.phone] || ""}
+    onChange={(e) =>
+      setReplyMessage((prev) => ({
+        ...prev,
+        [conversation.phone]: e.target.value
+      }))
+    }
+  />
+
+  <button
+    onClick={() => sendManualMessage(conversation.phone)}
+    className="bg-blue-500/20 text-blue-400 px-4 rounded-lg text-sm"
+  >
+    Enviar
+  </button>
+</div>
               {[...(conversation.history || [])]
                 .reverse()
                 .map((msg, index) => (
