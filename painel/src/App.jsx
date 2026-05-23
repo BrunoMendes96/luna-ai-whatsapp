@@ -507,8 +507,9 @@ function App() {
                 </div>
               ))}
             </div>
-          </div>
+                   </div>
         </div>
+        </DragDropContext>
       </div>
     </div>
   );
