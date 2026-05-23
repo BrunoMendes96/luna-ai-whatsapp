@@ -1,0 +1,10 @@
+{
+  "name": "Luna AI CRM",
+  "short_name": "Luna CRM",
+  "description": "Painel CRM inteligente da Luna AI",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#050816",
+  "theme_color": "#8b5cf6",
+  "icons": []
+}
