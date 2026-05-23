@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 
 const API_URL = "https://luna-ai-whatsapp-production.up.railway.app";
 
@@ -62,19 +63,17 @@ function App() {
   const [appointments, setAppointments] = useState([]);
   const [replyMessage, setReplyMessage] = useState({});
   const [toasts, setToasts] = useState([]);
-  const [selectedPhone, setSelectedPhone] = useState(null);
 
   const lastMessageCountRef = useRef(0);
   const hasInteractedRef = useRef(false);
 
   function addToast(message) {
     const id = Date.now();
-
     setToasts((prev) => [...prev, { id, message }]);
 
     setTimeout(() => {
       setToasts((prev) => prev.filter((toast) => toast.id !== id));
-    }, 4000);
+    }, 3500);
   }
 
   function login(e) {
@@ -84,11 +83,7 @@ function App() {
       email.trim().toLowerCase() === "bruno.coop32@icloud.com" &&
       password.trim() === "jaftYw-nirke9-dibsab"
     ) {
-      const adminSession = {
-        user: {
-          email: "bruno.coop32@icloud.com"
-        }
-      };
+      const adminSession = { user: { email: "bruno.coop32@icloud.com" } };
 
       localStorage.setItem("luna_admin", JSON.stringify(adminSession));
 
@@ -119,10 +114,6 @@ function App() {
 
       setConversations(data);
 
-      if (!selectedPhone && data.length > 0) {
-        setSelectedPhone(data[data.length - 1].phone);
-      }
-
       const totalMessages = data.reduce((total, conversation) => {
         return total + (conversation.history?.length || 0);
       }, 0);
@@ -135,7 +126,7 @@ function App() {
           playBeep();
         }
 
-        addToast("Nova mensagem recebida no CRM");
+        addToast("Nova mensagem recebida");
       }
 
       lastMessageCountRef.current = totalMessages;
@@ -208,7 +199,7 @@ function App() {
       return;
     }
 
-    addToast("Agendamento confirmado com sucesso");
+    addToast("Agendamento confirmado");
     await loadConversations();
     await loadAppointments();
   }
@@ -245,6 +236,16 @@ function App() {
     await loadConversations();
   }
 
+  async function handleDragEnd(result) {
+    if (!result.destination) return;
+
+    const phone = result.draggableId;
+    const newStatus = result.destination.droppableId;
+
+    await updateStatus(phone, newStatus);
+    addToast("Lead movido");
+  }
+
   useEffect(() => {
     if (!session) return;
 
@@ -257,7 +258,7 @@ function App() {
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [session, selectedPhone]);
+  }, [session]);
 
   if (!session) {
     return (
@@ -301,10 +302,6 @@ function App() {
     );
   }
 
-  const selectedConversation =
-    conversations.find((conversation) => conversation.phone === selectedPhone) ||
-    conversations[conversations.length - 1];
-
   return (
     <div
       className="min-h-screen bg-zinc-950 text-white p-4"
@@ -315,7 +312,7 @@ function App() {
       <ToastArea toasts={toasts} />
 
       <div className="max-w-[1900px] mx-auto">
-        <div className="flex justify-between items-center mb-5">
+        <div className="flex justify-between items-center mb-4">
           <div>
             <h1 className="text-3xl font-bold">Luna AI CRM</h1>
             <p className="text-zinc-400 text-sm">{session.user.email}</p>
@@ -329,88 +326,33 @@ function App() {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-[1.1fr_1fr_320px] gap-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-4">
             {STATUS_OPTIONS.map((status) => (
               <Column
                 key={status}
                 status={status}
                 conversations={conversations}
-                selectedPhone={selectedPhone}
-                setSelectedPhone={setSelectedPhone}
+                updateStatus={updateStatus}
+                updateDetails={updateDetails}
+                confirmAppointment={confirmAppointment}
+                replyMessage={replyMessage}
+                setReplyMessage={setReplyMessage}
+                sendManualMessage={sendManualMessage}
               />
             ))}
+
+            <Appointments appointments={appointments} />
           </div>
-
-          <ChatPanel
-            conversation={selectedConversation}
-            updateStatus={updateStatus}
-            updateDetails={updateDetails}
-            confirmAppointment={confirmAppointment}
-            replyMessage={replyMessage}
-            setReplyMessage={setReplyMessage}
-            sendManualMessage={sendManualMessage}
-          />
-
-          <Appointments appointments={appointments} />
-        </div>
+        </DragDropContext>
       </div>
     </div>
   );
 }
 
-function Column({ status, conversations, selectedPhone, setSelectedPhone }) {
-  const filtered = conversations
-    .filter((item) => (item.status || "Novo Lead") === status)
-    .reverse();
-
-  return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 h-[680px] overflow-y-auto">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-bold">{status}</h2>
-        <span className="bg-zinc-800 px-2 py-1 rounded-lg text-xs">
-          {filtered.length}
-        </span>
-      </div>
-
-      <div className="space-y-3">
-        {filtered.map((conversation) => (
-          <button
-            key={conversation.phone}
-            onClick={() => setSelectedPhone(conversation.phone)}
-            className={`w-full text-left rounded-2xl p-3 transition ${
-              selectedPhone === conversation.phone
-                ? "bg-blue-500/20 border border-blue-500/40"
-                : "bg-zinc-800 hover:bg-zinc-700 border border-transparent"
-            }`}
-          >
-            <div className="flex items-center justify-between mb-2">
-              <p className="font-bold text-sm">
-                {conversation.customer_name || "Cliente"}
-              </p>
-
-              {(conversation.status || "Novo Lead") === "Novo Lead" && (
-                <span className="bg-green-500/20 text-green-400 text-[10px] px-2 py-1 rounded-full">
-                  NOVO
-                </span>
-              )}
-            </div>
-
-            <p className="text-xs text-zinc-400">{conversation.phone}</p>
-
-            <p className="text-xs text-zinc-500 mt-3 line-clamp-2">
-              {conversation.history?.[conversation.history.length - 1]
-                ?.content || "Sem mensagens"}
-            </p>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function ChatPanel({
-  conversation,
+function Column({
+  status,
+  conversations,
   updateStatus,
   updateDetails,
   confirmAppointment,
@@ -418,126 +360,174 @@ function ChatPanel({
   setReplyMessage,
   sendManualMessage
 }) {
-  if (!conversation) {
-    return (
-      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl h-[680px] flex items-center justify-center text-zinc-500">
-        Selecione uma conversa
-      </div>
-    );
-  }
+  const filtered = conversations
+    .filter((item) => (item.status || "Novo Lead") === status)
+    .reverse();
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl h-[680px] flex flex-col overflow-hidden">
-      <div className="border-b border-zinc-800 p-4">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-full bg-blue-500/30 text-blue-300 flex items-center justify-center font-bold">
-            C
+    <Droppable droppableId={status}>
+      {(provided, snapshot) => (
+        <div
+          ref={provided.innerRef}
+          {...provided.droppableProps}
+          className={`bg-zinc-900 border rounded-2xl p-3 h-[660px] overflow-y-auto transition ${
+            snapshot.isDraggingOver
+              ? "border-blue-500 bg-blue-500/10"
+              : "border-zinc-800"
+          }`}
+        >
+          <div className="flex justify-between items-center mb-3 sticky top-0 bg-zinc-900 pb-2 z-10">
+            <h2 className="text-base font-bold">{status}</h2>
+            <span className="bg-zinc-800 px-2 py-1 rounded-lg text-xs">
+              {filtered.length}
+            </span>
           </div>
 
-          <div>
-            <h2 className="text-xl font-bold">
-              {conversation.customer_name || "Cliente"}
-            </h2>
-            <p className="text-zinc-400 text-sm">{conversation.phone}</p>
+          <div className="space-y-3">
+            {filtered.map((conversation, index) => (
+              <Draggable
+                key={conversation.phone}
+                draggableId={conversation.phone}
+                index={index}
+              >
+                {(provided, snapshot) => (
+                  <div
+                    ref={provided.innerRef}
+                    {...provided.draggableProps}
+                    className={`bg-zinc-800 rounded-2xl p-3 transition ${
+                      snapshot.isDragging
+                        ? "ring-2 ring-blue-500 scale-[1.02]"
+                        : ""
+                    }`}
+                  >
+                    <div
+                      {...provided.dragHandleProps}
+                      className="flex items-center justify-between mb-2 cursor-grab active:cursor-grabbing"
+                    >
+                      <p className="font-bold text-sm">{conversation.phone}</p>
+
+                      {(conversation.status || "Novo Lead") === "Novo Lead" && (
+                        <span className="bg-green-500/20 text-green-400 text-[10px] px-2 py-1 rounded-full">
+                          NOVO
+                        </span>
+                      )}
+                    </div>
+
+                    <input
+                      className="w-full bg-zinc-900 rounded-lg p-2 mb-2 text-xs"
+                      placeholder="Nome"
+                      defaultValue={conversation.customer_name || ""}
+                      onBlur={(e) =>
+                        updateDetails(
+                          conversation.phone,
+                          e.target.value,
+                          conversation.notes || ""
+                        )
+                      }
+                    />
+
+                    <textarea
+                      className="w-full bg-zinc-900 rounded-lg p-2 mb-2 text-xs h-12"
+                      placeholder="Observações"
+                      defaultValue={conversation.notes || ""}
+                      onBlur={(e) =>
+                        updateDetails(
+                          conversation.phone,
+                          conversation.customer_name || "",
+                          e.target.value
+                        )
+                      }
+                    />
+
+                    <select
+                      className="w-full bg-zinc-900 rounded-lg p-2 mb-2 text-xs"
+                      value={conversation.status || "Novo Lead"}
+                      onChange={(e) =>
+                        updateStatus(conversation.phone, e.target.value)
+                      }
+                    >
+                      {STATUS_OPTIONS.map((item) => (
+                        <option key={item} value={item}>
+                          {item}
+                        </option>
+                      ))}
+                    </select>
+
+                    {(conversation.status || "").includes("Aguardando") && (
+                      <div className="grid grid-cols-2 gap-2 mb-2">
+                        <button
+                          onClick={() => confirmAppointment(conversation)}
+                          className="bg-green-500/20 text-green-400 rounded-lg p-2 text-xs"
+                        >
+                          Confirmar
+                        </button>
+
+                        <button
+                          onClick={() =>
+                            updateStatus(conversation.phone, "Perdido")
+                          }
+                          className="bg-red-500/20 text-red-400 rounded-lg p-2 text-xs"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    )}
+
+                    <div className="h-52 overflow-y-auto space-y-2 pr-1 border-t border-zinc-700 pt-2">
+                      {[...(conversation.history || [])]
+                        .reverse()
+                        .map((msg, index) => (
+                          <MessageBubble key={index} msg={msg} />
+                        ))}
+                    </div>
+
+                    <div className="mt-2 flex gap-2">
+                      <input
+                        className="flex-1 bg-zinc-900 rounded-lg p-2 text-xs"
+                        placeholder="Responder..."
+                        value={replyMessage[conversation.phone] || ""}
+                        onChange={(e) =>
+                          setReplyMessage((prev) => ({
+                            ...prev,
+                            [conversation.phone]: e.target.value
+                          }))
+                        }
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            sendManualMessage(conversation.phone);
+                          }
+                        }}
+                      />
+
+                      <button
+                        onClick={() => sendManualMessage(conversation.phone)}
+                        className="bg-blue-500/20 text-blue-400 px-3 rounded-lg text-xs"
+                      >
+                        Enviar
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </Draggable>
+            ))}
+
+            {provided.placeholder}
           </div>
         </div>
-
-        <input
-          className="w-full bg-zinc-800 rounded-lg p-2 mb-2 text-sm"
-          placeholder="Nome"
-          defaultValue={conversation.customer_name || ""}
-          onBlur={(e) =>
-            updateDetails(
-              conversation.phone,
-              e.target.value,
-              conversation.notes || ""
-            )
-          }
-        />
-
-        <textarea
-          className="w-full bg-zinc-800 rounded-lg p-2 mb-2 text-sm h-14"
-          placeholder="Observações"
-          defaultValue={conversation.notes || ""}
-          onBlur={(e) =>
-            updateDetails(
-              conversation.phone,
-              conversation.customer_name || "",
-              e.target.value
-            )
-          }
-        />
-
-        <select
-          className="w-full bg-zinc-800 rounded-lg p-2 text-sm"
-          value={conversation.status || "Novo Lead"}
-          onChange={(e) => updateStatus(conversation.phone, e.target.value)}
-        >
-          {STATUS_OPTIONS.map((item) => (
-            <option key={item} value={item}>
-              {item}
-            </option>
-          ))}
-        </select>
-
-        {(conversation.status || "").includes("Aguardando") && (
-          <div className="grid grid-cols-2 gap-2 mt-3">
-            <button
-              onClick={() => confirmAppointment(conversation)}
-              className="bg-green-500/20 text-green-400 rounded-lg p-2 text-sm"
-            >
-              Confirmar
-            </button>
-
-            <button
-              onClick={() => updateStatus(conversation.phone, "Perdido")}
-              className="bg-red-500/20 text-red-400 rounded-lg p-2 text-sm"
-            >
-              Cancelar
-            </button>
-          </div>
-        )}
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
-        {[...(conversation.history || [])].reverse().map((msg, index) => (
-          <MessageBubble key={index} msg={msg} />
-        ))}
-      </div>
-
-      <div className="border-t border-zinc-800 p-4 flex gap-2">
-        <input
-          className="flex-1 bg-zinc-800 rounded-xl p-3 text-sm"
-          placeholder="Responder cliente..."
-          value={replyMessage[conversation.phone] || ""}
-          onChange={(e) =>
-            setReplyMessage((prev) => ({
-              ...prev,
-              [conversation.phone]: e.target.value
-            }))
-          }
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              sendManualMessage(conversation.phone);
-            }
-          }}
-        />
-
-        <button
-          onClick={() => sendManualMessage(conversation.phone)}
-          className="bg-blue-500/20 text-blue-400 px-5 rounded-xl"
-        >
-          Enviar
-        </button>
-      </div>
-    </div>
+      )}
+    </Droppable>
   );
 }
 
 function Appointments({ appointments }) {
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 h-[680px] overflow-y-auto">
-      <h2 className="text-xl font-bold mb-4">Agendamentos</h2>
+    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-3 h-[660px] overflow-y-auto">
+      <div className="flex justify-between items-center mb-3 sticky top-0 bg-zinc-900 pb-2 z-10">
+        <h2 className="text-base font-bold">Agendamentos</h2>
+        <span className="bg-zinc-800 px-2 py-1 rounded-lg text-xs">
+          {appointments.length}
+        </span>
+      </div>
 
       <div className="space-y-3">
         {appointments.map((item) => (
@@ -547,9 +537,7 @@ function Appointments({ appointments }) {
             </p>
             <p className="text-xs text-zinc-400">{item.phone}</p>
             <p className="text-xs mt-2">{item.service}</p>
-            <p className="text-xs text-green-400">
-              {item.appointment_date}
-            </p>
+            <p className="text-xs text-green-400">{item.appointment_date}</p>
           </div>
         ))}
       </div>
@@ -562,16 +550,16 @@ function MessageBubble({ msg }) {
 
   return (
     <div
-      className={`rounded-xl p-3 text-sm border ${
+      className={`rounded-xl p-2 text-xs border ${
         isClient
-          ? "bg-zinc-800 border-zinc-700"
+          ? "bg-zinc-700 border-zinc-600"
           : "bg-green-500/20 border-green-500/20"
       }`}
     >
       <div className="flex items-center justify-between mb-1">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           <div
-            className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${
+            className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold ${
               isClient
                 ? "bg-blue-500/30 text-blue-300"
                 : "bg-green-500/30 text-green-300"
@@ -580,12 +568,12 @@ function MessageBubble({ msg }) {
             {isClient ? "C" : "IA"}
           </div>
 
-          <p className="text-[10px] text-zinc-400">
+          <p className="text-[9px] text-zinc-400">
             {isClient ? "Cliente" : "Luna IA"}
           </p>
         </div>
 
-        <p className="text-[10px] text-zinc-500">
+        <p className="text-[9px] text-zinc-500">
           {formatTime(msg.created_at)}
         </p>
       </div>
