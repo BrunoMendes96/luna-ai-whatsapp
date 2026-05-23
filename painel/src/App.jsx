@@ -13,10 +13,8 @@ const STATUS_OPTIONS = [
 function playBeep() {
   try {
     const audio = new AudioContext();
-
     const oscillator1 = audio.createOscillator();
     const oscillator2 = audio.createOscillator();
-
     const gain = audio.createGain();
 
     oscillator1.connect(gain);
@@ -39,6 +37,15 @@ function playBeep() {
   }
 }
 
+function formatTime(date) {
+  if (!date) return "agora";
+
+  return new Date(date).toLocaleTimeString("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
 function App() {
   const [session, setSession] = useState(() => {
     const saved = localStorage.getItem("luna_admin");
@@ -52,9 +59,26 @@ function App() {
   const [conversations, setConversations] = useState([]);
   const [appointments, setAppointments] = useState([]);
   const [replyMessage, setReplyMessage] = useState({});
+  const [toasts, setToasts] = useState([]);
 
   const lastMessageCountRef = useRef(0);
   const hasInteractedRef = useRef(false);
+
+  function addToast(message) {
+    const id = Date.now();
+
+    setToasts((prev) => [
+      ...prev,
+      {
+        id,
+        message
+      }
+    ]);
+
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((toast) => toast.id !== id));
+    }, 4000);
+  }
 
   function login(e) {
     e.preventDefault();
@@ -97,10 +121,13 @@ function App() {
 
       if (
         lastMessageCountRef.current !== 0 &&
-        totalMessages > lastMessageCountRef.current &&
-        hasInteractedRef.current
+        totalMessages > lastMessageCountRef.current
       ) {
-        playBeep();
+        if (hasInteractedRef.current) {
+          playBeep();
+        }
+
+        addToast("Nova mensagem recebida no CRM");
       }
 
       lastMessageCountRef.current = totalMessages;
@@ -122,7 +149,9 @@ function App() {
   async function updateStatus(phone, status) {
     await fetch(`${API_URL}/api/conversations/status`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json"
+      },
       body: JSON.stringify({ phone, status })
     });
 
@@ -132,8 +161,14 @@ function App() {
   async function updateDetails(phone, customer_name, notes) {
     await fetch(`${API_URL}/api/conversations/details`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ phone, customer_name, notes })
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        phone,
+        customer_name,
+        notes
+      })
     });
 
     await loadConversations();
@@ -147,7 +182,9 @@ function App() {
 
     const response = await fetch(`${API_URL}/api/confirm-appointment`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json"
+      },
       body: JSON.stringify({
         customer_name: conversation.customer_name || "Cliente",
         phone: conversation.phone,
@@ -163,7 +200,7 @@ function App() {
       return;
     }
 
-    alert("Agendamento confirmado!");
+    addToast("Agendamento confirmado com sucesso");
     await loadConversations();
     await loadAppointments();
   }
@@ -196,6 +233,7 @@ function App() {
       [phone]: ""
     }));
 
+    addToast("Mensagem enviada");
     await loadConversations();
   }
 
@@ -216,7 +254,10 @@ function App() {
   if (!session) {
     return (
       <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center p-6">
-        <form onSubmit={login} className="bg-zinc-900 p-8 rounded-2xl w-full max-w-sm border border-zinc-800">
+        <form
+          onSubmit={login}
+          className="bg-zinc-900 p-8 rounded-2xl w-full max-w-sm border border-zinc-800"
+        >
           <h1 className="text-3xl font-bold mb-2">Luna AI</h1>
           <p className="text-zinc-400 text-sm mb-6">Painel administrativo</p>
 
@@ -259,6 +300,8 @@ function App() {
         hasInteractedRef.current = true;
       }}
     >
+      <ToastArea toasts={toasts} />
+
       <div className="max-w-[1800px] mx-auto">
         <div className="flex justify-between items-center mb-5">
           <div>
@@ -409,17 +452,7 @@ function Column({
               {[...(conversation.history || [])]
                 .reverse()
                 .map((msg, index) => (
-                  <div
-                    key={index}
-                    className={`rounded-xl p-2 text-sm ${
-                      msg.role === "user" ? "bg-zinc-700" : "bg-green-500/20"
-                    }`}
-                  >
-                    <p className="text-[10px] text-zinc-400 mb-1">
-                      {msg.role === "user" ? "Cliente" : "IA"}
-                    </p>
-                    <p>{msg.content}</p>
-                  </div>
+                  <MessageBubble key={index} msg={msg} />
                 ))}
             </div>
 
@@ -446,6 +479,58 @@ function Column({
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+function MessageBubble({ msg }) {
+  const isClient = msg.role === "user";
+
+  return (
+    <div
+      className={`rounded-xl p-2 text-sm border ${
+        isClient
+          ? "bg-zinc-700 border-zinc-600"
+          : "bg-green-500/20 border-green-500/20"
+      }`}
+    >
+      <div className="flex items-center justify-between mb-1">
+        <div className="flex items-center gap-2">
+          <div
+            className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${
+              isClient ? "bg-blue-500/30 text-blue-300" : "bg-green-500/30 text-green-300"
+            }`}
+          >
+            {isClient ? "C" : "IA"}
+          </div>
+
+          <p className="text-[10px] text-zinc-400">
+            {isClient ? "Cliente" : "Luna IA"}
+          </p>
+        </div>
+
+        <p className="text-[10px] text-zinc-500">
+          {formatTime(msg.created_at)}
+        </p>
+      </div>
+
+      <p>{msg.content}</p>
+    </div>
+  );
+}
+
+function ToastArea({ toasts }) {
+  return (
+    <div className="fixed top-4 right-4 z-50 space-y-3">
+      {toasts.map((toast) => (
+        <div
+          key={toast.id}
+          className="bg-zinc-900 border border-zinc-700 text-white rounded-2xl px-5 py-4 shadow-2xl animate-pulse"
+        >
+          <p className="font-bold text-sm">Luna AI CRM</p>
+          <p className="text-zinc-300 text-sm">{toast.message}</p>
+        </div>
+      ))}
     </div>
   );
 }
