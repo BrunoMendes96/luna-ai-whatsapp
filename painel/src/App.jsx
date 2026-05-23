@@ -67,6 +67,17 @@ function App() {
   const lastMessageCountRef = useRef(0);
   const hasInteractedRef = useRef(false);
 
+  const totalRevenue = appointments.reduce((total, item) => {
+    return total + Number(item.price || 0);
+  }, 0);
+
+  const averageTicket =
+    appointments.length > 0 ? totalRevenue / appointments.length : 0;
+
+  const closedLeads = conversations.filter(
+    (item) => item.status === "Fechado"
+  ).length;
+
   function addToast(message) {
     const id = Date.now();
     setToasts((prev) => [...prev, { id, message }]);
@@ -185,13 +196,13 @@ function App() {
       headers: {
         "Content-Type": "application/json"
       },
-     body: JSON.stringify({
-  customer_name: conversation.customer_name || "Cliente",
-  phone: conversation.phone,
-  service,
-  appointment_date: appointmentDate,
-  price
-})
+      body: JSON.stringify({
+        customer_name: conversation.customer_name || "Cliente",
+        phone: conversation.phone,
+        service,
+        appointment_date: appointmentDate,
+        price
+      })
     });
 
     const data = await response.json();
@@ -326,6 +337,41 @@ function App() {
           >
             Sair
           </button>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+          <FinanceCard
+            title="Faturamento"
+            value={`R$ ${totalRevenue.toFixed(2)}`}
+          />
+
+          <FinanceCard
+            title="Agendamentos"
+            value={appointments.length}
+          />
+
+          <FinanceCard
+            title="Ticket Médio"
+            value={`R$ ${averageTicket.toFixed(2)}`}
+          />
+
+          <FinanceCard
+            title="Fechados"
+            value={closedLeads}
+          />
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+          <FinanceCard
+            title="Faturamento"
+            value={`R$ ${totalRevenue.toFixed(2)}`}
+          />
+          <FinanceCard title="Agendamentos" value={appointments.length} />
+          <FinanceCard
+            title="Ticket Médio"
+            value={`R$ ${averageTicket.toFixed(2)}`}
+          />
+          <FinanceCard title="Fechados" value={closedLeads} />
         </div>
 
         <DragDropContext onDragEnd={handleDragEnd}>
@@ -541,8 +587,8 @@ function Appointments({ appointments }) {
             <p className="text-xs mt-2">{item.service}</p>
             <p className="text-xs text-green-400">{item.appointment_date}</p>
             <p className="text-xs text-emerald-400 font-bold">
-  R$ {Number(item.price || 0).toFixed(2)}
-</p>
+              R$ {Number(item.price || 0).toFixed(2)}
+            </p>
           </div>
         ))}
       </div>
@@ -584,6 +630,15 @@ function MessageBubble({ msg }) {
       </div>
 
       <p>{msg.content}</p>
+    </div>
+  );
+}
+
+function FinanceCard({ title, value }) {
+  return (
+    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4">
+      <p className="text-xs text-zinc-400">{title}</p>
+      <p className="text-2xl font-bold mt-2">{value}</p>
     </div>
   );
 }
