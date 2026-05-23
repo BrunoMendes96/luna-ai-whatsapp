@@ -1,5 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 
+import {
+  DragDropContext,
+  Droppable,
+  Draggable
+} from "@hello-pangea/dnd";
+
 const API_URL = "https://luna-ai-whatsapp-production.up.railway.app";
 
 const STATUS_OPTIONS = [
@@ -317,19 +323,171 @@ function App() {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-4">
+        <DragDropContext
+  onDragEnd={async (result) => {
+    if (!result.destination) return;
+
+    const phone = result.draggableId;
+    const newStatus = result.destination.droppableId;
+
+    await updateStatus(phone, newStatus);
+  }}
+>
+  <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-4">
           {STATUS_OPTIONS.map((status) => (
-            <Column
-              key={status}
-              status={status}
-              conversations={conversations}
-              updateStatus={updateStatus}
-              updateDetails={updateDetails}
-              confirmAppointment={confirmAppointment}
-              replyMessage={replyMessage}
-              setReplyMessage={setReplyMessage}
-              sendManualMessage={sendManualMessage}
-            />
+            function Column({
+  status,
+  conversations,
+  updateStatus,
+  updateDetails,
+  confirmAppointment,
+  replyMessage,
+  setReplyMessage,
+  sendManualMessage
+}) {
+  const filtered = conversations
+    .filter((item) => (item.status || "Novo Lead") === status)
+    .reverse();
+
+  return (
+    <Droppable droppableId={status}>
+      {(provided) => (
+        <div
+          ref={provided.innerRef}
+          {...provided.droppableProps}
+          className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 h-[680px] overflow-y-auto"
+        >
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold">{status}</h2>
+            <span className="bg-zinc-800 px-2 py-1 rounded-lg text-xs">
+              {filtered.length}
+            </span>
+          </div>
+
+          <div className="space-y-4">
+            {filtered.map((conversation, index) => (
+              <Draggable
+                key={conversation.phone}
+                draggableId={conversation.phone}
+                index={index}
+              >
+                {(provided) => (
+                  <div
+                    ref={provided.innerRef}
+                    {...provided.draggableProps}
+                    {...provided.dragHandleProps}
+                    className="bg-zinc-800 rounded-2xl p-3 cursor-grab active:cursor-grabbing"
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="font-bold text-sm">{conversation.phone}</p>
+
+                      {(conversation.status || "Novo Lead") === "Novo Lead" && (
+                        <span className="bg-green-500/20 text-green-400 text-[10px] px-2 py-1 rounded-full">
+                          NOVO
+                        </span>
+                      )}
+                    </div>
+
+                    <input
+                      className="w-full bg-zinc-900 rounded-lg p-2 mb-2 text-sm"
+                      placeholder="Nome"
+                      defaultValue={conversation.customer_name || ""}
+                      onBlur={(e) =>
+                        updateDetails(
+                          conversation.phone,
+                          e.target.value,
+                          conversation.notes || ""
+                        )
+                      }
+                    />
+
+                    <textarea
+                      className="w-full bg-zinc-900 rounded-lg p-2 mb-2 text-sm h-14"
+                      placeholder="Observações"
+                      defaultValue={conversation.notes || ""}
+                      onBlur={(e) =>
+                        updateDetails(
+                          conversation.phone,
+                          conversation.customer_name || "",
+                          e.target.value
+                        )
+                      }
+                    />
+
+                    <select
+                      className="w-full bg-zinc-900 rounded-lg p-2 mb-2 text-sm"
+                      value={conversation.status || "Novo Lead"}
+                      onChange={(e) =>
+                        updateStatus(conversation.phone, e.target.value)
+                      }
+                    >
+                      {STATUS_OPTIONS.map((item) => (
+                        <option key={item} value={item}>
+                          {item}
+                        </option>
+                      ))}
+                    </select>
+
+                    {(conversation.status || "").includes("Aguardando") && (
+                      <div className="grid grid-cols-2 gap-2 mb-3">
+                        <button
+                          onClick={() => confirmAppointment(conversation)}
+                          className="bg-green-500/20 text-green-400 rounded-lg p-2 text-sm"
+                        >
+                          Confirmar
+                        </button>
+
+                        <button
+                          onClick={() =>
+                            updateStatus(conversation.phone, "Perdido")
+                          }
+                          className="bg-red-500/20 text-red-400 rounded-lg p-2 text-sm"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    )}
+
+                    <div className="h-64 overflow-y-auto space-y-2 pr-1 border-t border-zinc-700 pt-3">
+                      {[...(conversation.history || [])]
+                        .reverse()
+                        .map((msg, index) => (
+                          <MessageBubble key={index} msg={msg} />
+                        ))}
+                    </div>
+
+                    <div className="mt-3 flex gap-2">
+                      <input
+                        className="flex-1 bg-zinc-900 rounded-lg p-2 text-sm"
+                        placeholder="Responder..."
+                        value={replyMessage[conversation.phone] || ""}
+                        onChange={(e) =>
+                          setReplyMessage((prev) => ({
+                            ...prev,
+                            [conversation.phone]: e.target.value
+                          }))
+                        }
+                      />
+
+                      <button
+                        onClick={() => sendManualMessage(conversation.phone)}
+                        className="bg-blue-500/20 text-blue-400 px-3 rounded-lg text-sm"
+                      >
+                        Enviar
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </Draggable>
+            ))}
+
+            {provided.placeholder}
+          </div>
+        </div>
+      )}
+    </Droppable>
+  );
+}
           ))}
 
           <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 h-[680px] overflow-y-auto">
