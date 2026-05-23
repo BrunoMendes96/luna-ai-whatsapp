@@ -507,6 +507,9 @@ function App() {
             <p className="text-zinc-400 text-sm">
               {session.user.email}
             </p>
+            <p className="text-xs text-purple-300 mt-1">
+  Empresa: Luna Studio • Atendente: Admin
+</p>
           </div>
 
           <button
