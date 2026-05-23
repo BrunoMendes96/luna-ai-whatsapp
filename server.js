@@ -54,10 +54,11 @@ app.get("/api/conversations", async (req, res) => {
       };
     }
 
-    grouped[item.phone].history.push({
-      role: item.role,
-      content: item.content
-    });
+   grouped[item.phone].history.push({
+  role: item.role,
+  content: item.content,
+  created_at: item.created_at
+});
   });
 
   res.json(Object.values(grouped));
