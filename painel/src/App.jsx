@@ -10,9 +10,24 @@ const STATUS_OPTIONS = [
   "Perdido"
 ];
 
-const notificationSound = new Audio(
-  "https://actions.google.com/sounds/v1/cartoon/pop.ogg"
-);
+function playBeep() {
+  try {
+    const audio = new AudioContext();
+    const oscillator = audio.createOscillator();
+    const gain = audio.createGain();
+
+    oscillator.connect(gain);
+    gain.connect(audio.destination);
+
+    oscillator.frequency.value = 880;
+    gain.gain.value = 0.08;
+
+    oscillator.start();
+    oscillator.stop(audio.currentTime + 0.15);
+  } catch (error) {
+    console.log("Som bloqueado:", error.message);
+  }
+}
 
 function App() {
   const [session, setSession] = useState(() => {
@@ -21,14 +36,13 @@ function App() {
   });
 
   const [email, setEmail] = useState(localStorage.getItem("saved_email") || "");
-  const [password, setPassword] = useState(
-    localStorage.getItem("saved_password") || ""
-  );
+  const [password, setPassword] = useState(localStorage.getItem("saved_password") || "");
   const [remember, setRemember] = useState(true);
 
   const [conversations, setConversations] = useState([]);
   const [appointments, setAppointments] = useState([]);
   const [replyMessage, setReplyMessage] = useState({});
+
   const lastMessageCountRef = useRef(0);
   const hasInteractedRef = useRef(false);
 
@@ -46,9 +60,6 @@ function App() {
       if (remember) {
         localStorage.setItem("saved_email", email);
         localStorage.setItem("saved_password", password);
-      } else {
-        localStorage.removeItem("saved_email");
-        localStorage.removeItem("saved_password");
       }
 
       setSession(adminSession);
@@ -76,22 +87,10 @@ function App() {
 
       if (
         lastMessageCountRef.current !== 0 &&
-        totalMessages > lastMessageCountRef.current
+        totalMessages > lastMessageCountRef.current &&
+        hasInteractedRef.current
       ) {
-        if (hasInteractedRef.current) {
-          try {
-            notificationSound.currentTime = 0;
-            notificationSound.play();
-          } catch (error) {
-            console.log("Som bloqueado:", error.message);
-          }
-        }
-
-        if ("Notification" in window && Notification.permission === "granted") {
-          new Notification("Nova mensagem recebida", {
-            body: "Chegou uma nova mensagem no Luna AI CRM."
-          });
-        }
+        playBeep();
       }
 
       lastMessageCountRef.current = totalMessages;
@@ -131,33 +130,6 @@ function App() {
   }
 
   async function confirmAppointment(conversation) {
-    async function sendManualMessage(phone) {
-  const message = replyMessage[phone];
-
-  if (!message?.trim()) return;
-
-  try {
-    await fetch(`${API_URL}/api/send-message`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        phone,
-        message
-      })
-    });
-
-    setReplyMessage((prev) => ({
-      ...prev,
-      [phone]: ""
-    }));
-
-    await loadConversations();
-  } catch (error) {
-    alert(error.message);
-  }
-}
     const service = prompt("Serviço:", "Piercing") || "Serviço não informado";
     const appointmentDate = prompt("Data e hora:", "25/05 15:00") || "";
 
@@ -186,12 +158,39 @@ function App() {
     await loadAppointments();
   }
 
+  async function sendManualMessage(phone) {
+    const message = replyMessage[phone];
+
+    if (!message?.trim()) return;
+
+    const response = await fetch(`${API_URL}/api/send-message`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        phone,
+        message
+      })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      alert(data.error || "Erro ao enviar mensagem");
+      return;
+    }
+
+    setReplyMessage((prev) => ({
+      ...prev,
+      [phone]: ""
+    }));
+
+    await loadConversations();
+  }
+
   useEffect(() => {
     if (!session) return;
-
-    if ("Notification" in window && Notification.permission === "default") {
-      Notification.requestPermission();
-    }
 
     loadConversations();
     loadAppointments();
@@ -207,10 +206,7 @@ function App() {
   if (!session) {
     return (
       <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center p-6">
-        <form
-          onSubmit={login}
-          className="bg-zinc-900 p-8 rounded-2xl w-full max-w-sm border border-zinc-800"
-        >
+        <form onSubmit={login} className="bg-zinc-900 p-8 rounded-2xl w-full max-w-sm border border-zinc-800">
           <h1 className="text-3xl font-bold mb-2">Luna AI</h1>
           <p className="text-zinc-400 text-sm mb-6">Painel administrativo</p>
 
@@ -277,6 +273,9 @@ function App() {
               updateStatus={updateStatus}
               updateDetails={updateDetails}
               confirmAppointment={confirmAppointment}
+              replyMessage={replyMessage}
+              setReplyMessage={setReplyMessage}
+              sendManualMessage={sendManualMessage}
             />
           ))}
 
@@ -309,7 +308,10 @@ function Column({
   conversations,
   updateStatus,
   updateDetails,
-  confirmAppointment
+  confirmAppointment,
+  replyMessage,
+  setReplyMessage,
+  sendManualMessage
 }) {
   const filtered = conversations
     .filter((item) => (item.status || "Novo Lead") === status)
@@ -394,26 +396,6 @@ function Column({
             )}
 
             <div className="h-64 overflow-y-auto space-y-2 pr-1 border-t border-zinc-700 pt-3">
-              <div className="mt-3 flex gap-2">
-  <input
-    className="flex-1 bg-zinc-900 rounded-lg p-2 text-sm"
-    placeholder="Responder cliente..."
-    value={replyMessage[conversation.phone] || ""}
-    onChange={(e) =>
-      setReplyMessage((prev) => ({
-        ...prev,
-        [conversation.phone]: e.target.value
-      }))
-    }
-  />
-
-  <button
-    onClick={() => sendManualMessage(conversation.phone)}
-    className="bg-blue-500/20 text-blue-400 px-4 rounded-lg text-sm"
-  >
-    Enviar
-  </button>
-</div>
               {[...(conversation.history || [])]
                 .reverse()
                 .map((msg, index) => (
@@ -429,6 +411,27 @@ function Column({
                     <p>{msg.content}</p>
                   </div>
                 ))}
+            </div>
+
+            <div className="mt-3 flex gap-2">
+              <input
+                className="flex-1 bg-zinc-900 rounded-lg p-2 text-sm"
+                placeholder="Responder..."
+                value={replyMessage[conversation.phone] || ""}
+                onChange={(e) =>
+                  setReplyMessage((prev) => ({
+                    ...prev,
+                    [conversation.phone]: e.target.value
+                  }))
+                }
+              />
+
+              <button
+                onClick={() => sendManualMessage(conversation.phone)}
+                className="bg-blue-500/20 text-blue-400 px-3 rounded-lg text-sm"
+              >
+                Enviar
+              </button>
             </div>
           </div>
         ))}
