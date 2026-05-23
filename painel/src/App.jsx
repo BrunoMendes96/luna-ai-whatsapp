@@ -5,6 +5,8 @@ import {
   BarChart,
   Bar,
   XAxis,
+  YAxis,
+  CartesianGrid,
   Tooltip,
   PieChart,
   Pie,
@@ -55,6 +57,28 @@ function formatTime(date) {
     hour: "2-digit",
     minute: "2-digit"
   });
+}
+
+function formatMoney(value) {
+  return Number(value || 0).toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL"
+  });
+}
+
+function ChartTooltip({ active, payload, label }) {
+  if (!active || !payload || payload.length === 0) return null;
+
+  return (
+    <div className="bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 shadow-xl">
+      <p className="text-xs text-zinc-400">{label || "Valor"}</p>
+      <p className="text-sm font-bold text-white">
+        {payload[0]?.name === "value"
+          ? formatMoney(payload[0]?.value)
+          : payload[0]?.value}
+      </p>
+    </div>
+  );
 }
 
 function App() {
@@ -371,7 +395,7 @@ const COLORS = [
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
           <FinanceCard
             title="Faturamento"
-            value={`R$ ${totalRevenue.toFixed(2)}`}
+            value={formatMoney(totalRevenue)}
           />
 
           <FinanceCard
@@ -381,7 +405,7 @@ const COLORS = [
 
           <FinanceCard
             title="Ticket Médio"
-            value={`R$ ${averageTicket.toFixed(2)}`}
+            value={formatMoney(averageTicket)}
           />
 
           <FinanceCard
@@ -393,12 +417,12 @@ const COLORS = [
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
           <FinanceCard
             title="Faturamento"
-            value={`R$ ${totalRevenue.toFixed(2)}`}
+            value={formatMoney(totalRevenue)}
           />
           <FinanceCard title="Agendamentos" value={appointments.length} />
           <FinanceCard
             title="Ticket Médio"
-            value={`R$ ${averageTicket.toFixed(2)}`}
+            value={formatMoney(averageTicket)}
           />
           <FinanceCard title="Fechados" value={closedLeads} />
         </div>
@@ -663,7 +687,7 @@ function Appointments({ appointments }) {
             <p className="text-xs mt-2">{item.service}</p>
             <p className="text-xs text-green-400">{item.appointment_date}</p>
             <p className="text-xs text-emerald-400 font-bold">
-              R$ {Number(item.price || 0).toFixed(2)}
+              {formatMoney(item.price)}
             </p>
           </div>
         ))}
