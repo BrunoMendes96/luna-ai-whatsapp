@@ -176,6 +176,7 @@ function App() {
   async function confirmAppointment(conversation) {
     const service = prompt("Serviço:", "Piercing") || "Serviço não informado";
     const appointmentDate = prompt("Data e hora:", "25/05 15:00") || "";
+    const price = prompt("Valor do serviço:", "50") || "0";
 
     if (!appointmentDate) return;
 
@@ -184,12 +185,13 @@ function App() {
       headers: {
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({
-        customer_name: conversation.customer_name || "Cliente",
-        phone: conversation.phone,
-        service,
-        appointment_date: appointmentDate
-      })
+     body: JSON.stringify({
+  customer_name: conversation.customer_name || "Cliente",
+  phone: conversation.phone,
+  service,
+  appointment_date: appointmentDate,
+  price
+})
     });
 
     const data = await response.json();

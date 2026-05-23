@@ -282,11 +282,12 @@ Vou verificar disponibilidade 💙`;
 app.post("/api/confirm-appointment", async (req, res) => {
   try {
     const {
-      customer_name,
-      phone,
-      service,
-      appointment_date
-    } = req.body;
+  customer_name,
+  phone,
+  service,
+  appointment_date,
+  price
+} = req.body;
 
     const { data: existing, error: checkError } = await supabase
       .from("appointments")
@@ -321,14 +322,16 @@ Pode me enviar outro dia ou horário que eu verifico para você?`;
 }
 
     const { error } = await supabase
-      .from("appointments")
-      .insert({
-        customer_name,
-        phone,
-        service,
-        appointment_date,
-        confirmed: true
-      });
+      await supabase
+  .from("appointments")
+  .insert({
+    customer_name,
+    phone,
+    service,
+    appointment_date,
+    price: Number(price || 0),
+    confirmed: true
+  });
 
     if (error) {
       return res.status(500).json({
