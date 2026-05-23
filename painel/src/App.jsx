@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
+import { io } from "socket.io-client";
 import {
   ResponsiveContainer,
   BarChart,
@@ -35,7 +36,8 @@ const COLUMN_COLORS = {
 
 function playBeep() {
   try {
-    const audio = new AudioContext();
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    const audio = new AudioContextClass();
     const oscillator1 = audio.createOscillator();
     const oscillator2 = audio.createOscillator();
     const gain = audio.createGain();
@@ -76,99 +78,36 @@ function formatMoney(value) {
   });
 }
 
-function getClientName(conversation) {
-  return conversation.customer_name || "Cliente";
-}
+function getInitials(name, phone) {
+  const value = (name || phone || "Cliente").trim();
 
-function getInitials(name) {
-  return (name || "Cliente")
-    .trim()
+  if (!value) return "C";
+
+  return value
     .split(" ")
-    .map((part) => part[0])
-    .join("")
     .slice(0, 2)
-    .toUpperCase();
+    .map((part) => part.charAt(0).toUpperCase())
+    .join("");
 }
 
 function getLastMessage(conversation) {
   const history = conversation.history || [];
-  return history[history.length - 1];
+  return history[history.length - 1]?.content || "Sem mensagens";
 }
 
-function getLastMessageText(conversation) {
-  return getLastMessage(conversation)?.content || "Sem mensagens ainda";
-}
-
-function isRecentlyActive(conversation) {
-  const lastMessage = getLastMessage(conversation);
-
-  if (!lastMessage?.created_at) {
-    return (conversation.history || []).length > 0;
-  }
-
-  const lastTime = new Date(lastMessage.created_at).getTime();
-  const diffMinutes = (Date.now() - lastTime) / 1000 / 60;
-
-  return diffMinutes <= 30;
-}
-
-function isWaitingForAI(conversation) {
-  const lastMessage = getLastMessage(conversation);
-  return lastMessage?.role === "user";
-}
-
-function getConversationSummary(conversation) {
+function getLastMessageTime(conversation) {
   const history = conversation.history || [];
-  const lastMessages = history
-    .slice(-4)
-    .map((msg) => msg.content)
-    .join(" ");
-
-  if (!lastMessages) return "Sem histórico suficiente.";
-
-  if (/agend|marcar|hor[aá]rio|dia|confirm/i.test(lastMessages)) {
-    return "Cliente com intenção de agendamento.";
-  }
-
-  if (/pre[cç]o|valor|quanto|custa/i.test(lastMessages)) {
-    return "Cliente perguntando sobre valores.";
-  }
-
-  if (/piercing/i.test(lastMessages)) {
-    return "Interesse em piercing.";
-  }
-
-  if (/tattoo|tatuagem/i.test(lastMessages)) {
-    return "Interesse em tattoo.";
-  }
-
-  if (/est[eé]tica/i.test(lastMessages)) {
-    return "Interesse em estética.";
-  }
-
-  return "Conversa em atendimento.";
+  return formatTime(history[history.length - 1]?.created_at);
 }
 
-function getFollowUpSuggestion(conversation) {
-  const status = conversation.status || "Novo Lead";
+function isRecentConversation(conversation) {
+  const history = conversation.history || [];
+  const last = history[history.length - 1]?.created_at;
 
-  if (status === "Novo Lead") {
-    return "Responder rápido e puxar para agendamento.";
-  }
+  if (!last) return false;
 
-  if (status === "Aguardando Confirmação") {
-    return "Confirmar disponibilidade ou sugerir outro horário.";
-  }
-
-  if (status === "Em Atendimento") {
-    return "Tirar dúvida e pedir melhor dia/horário.";
-  }
-
-  if (status === "Fechado") {
-    return "Enviar lembrete antes do horário.";
-  }
-
-  return "Reativar com mensagem curta e educada.";
+  const minutes = (Date.now() - new Date(last).getTime()) / 1000 / 60;
+  return minutes <= 10;
 }
 
 function ChartTooltip({ active, payload, label }) {
@@ -178,10 +117,7 @@ function ChartTooltip({ active, payload, label }) {
 
   return (
     <div className="bg-[#050816] border border-zinc-700 rounded-xl px-3 py-2 shadow-2xl">
-      <p className="text-xs text-zinc-400">
-        {label || current?.name || "Valor"}
-      </p>
-
+      <p className="text-xs text-zinc-400">{label || current?.name || "Valor"}</p>
       <p className="text-sm font-bold text-white">
         {current?.dataKey === "value"
           ? formatMoney(current?.value)
@@ -208,9 +144,12 @@ function App() {
   const [replyMessage, setReplyMessage] = useState({});
   const [toasts, setToasts] = useState([]);
   const [search, setSearch] = useState("");
+  const [typingPhones, setTypingPhones] = useState({});
+  const [socketConnected, setSocketConnected] = useState(false);
 
   const lastMessageCountRef = useRef(0);
   const hasInteractedRef = useRef(false);
+  const socketRef = useRef(null);
 
   const totalRevenue = appointments.reduce((total, item) => {
     return total + Number(item.price || 0);
@@ -222,6 +161,10 @@ function App() {
   const closedLeads = conversations.filter(
     (item) => item.status === "Fechado"
   ).length;
+
+  const totalMessages = conversations.reduce((total, item) => {
+    return total + (item.history?.length || 0);
+  }, 0);
 
   const statusData = STATUS_OPTIONS.map((status) => ({
     name: status.replace("Aguardando Confirmação", "Confirmação"),
@@ -239,11 +182,20 @@ function App() {
 
   function addToast(message) {
     const id = Date.now();
+
     setToasts((prev) => [...prev, { id, message }]);
 
     setTimeout(() => {
       setToasts((prev) => prev.filter((toast) => toast.id !== id));
     }, 3500);
+  }
+
+  function notifyDesktop(title, body) {
+    if (!("Notification" in window)) return;
+
+    if (Notification.permission === "granted") {
+      new Notification(title, { body });
+    }
   }
 
   function login(e) {
@@ -277,29 +229,31 @@ function App() {
     setSession(null);
   }
 
-  async function loadConversations() {
+  async function loadConversations(options = {}) {
     try {
       const response = await fetch(`${API_URL}/api/conversations`);
       const data = await response.json();
 
       setConversations(data);
 
-      const totalMessages = data.reduce((total, conversation) => {
+      const currentTotalMessages = data.reduce((total, conversation) => {
         return total + (conversation.history?.length || 0);
       }, 0);
 
       if (
+        !options.silent &&
         lastMessageCountRef.current !== 0 &&
-        totalMessages > lastMessageCountRef.current
+        currentTotalMessages > lastMessageCountRef.current
       ) {
         if (hasInteractedRef.current) {
           playBeep();
         }
 
         addToast("Nova mensagem recebida");
+        notifyDesktop("Luna AI CRM", "Nova mensagem recebida.");
       }
 
-      lastMessageCountRef.current = totalMessages;
+      lastMessageCountRef.current = currentTotalMessages;
     } catch (error) {
       console.error(error);
     }
@@ -324,7 +278,7 @@ function App() {
       body: JSON.stringify({ phone, status })
     });
 
-    await loadConversations();
+    await loadConversations({ silent: true });
   }
 
   async function updateDetails(phone, customer_name, notes) {
@@ -340,7 +294,7 @@ function App() {
       })
     });
 
-    await loadConversations();
+    await loadConversations({ silent: true });
   }
 
   async function confirmAppointment(conversation) {
@@ -372,7 +326,7 @@ function App() {
     }
 
     addToast("Agendamento confirmado");
-    await loadConversations();
+    await loadConversations({ silent: true });
     await loadAppointments();
   }
 
@@ -405,7 +359,27 @@ function App() {
     }));
 
     addToast("Mensagem enviada");
-    await loadConversations();
+    await loadConversations({ silent: true });
+  }
+
+  async function sendFollowUp(phone) {
+    const response = await fetch(`${API_URL}/api/follow-up`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ phone })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      alert(data.error || "Erro ao enviar follow-up");
+      return;
+    }
+
+    addToast("Follow-up enviado");
+    await loadConversations({ silent: true });
   }
 
   async function handleDragEnd(result) {
@@ -421,15 +395,71 @@ function App() {
   useEffect(() => {
     if (!session) return;
 
-    loadConversations();
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+
+    loadConversations({ silent: true });
     loadAppointments();
 
-    const interval = setInterval(() => {
-      loadConversations();
-      loadAppointments();
-    }, 3000);
+    const socket = io(API_URL, {
+      transports: ["websocket", "polling"]
+    });
 
-    return () => clearInterval(interval);
+    socketRef.current = socket;
+
+    socket.on("connect", () => {
+      setSocketConnected(true);
+      addToast("Tempo real conectado");
+    });
+
+    socket.on("disconnect", () => {
+      setSocketConnected(false);
+      addToast("Tempo real desconectado");
+    });
+
+    socket.on("new_message", (data) => {
+      if (hasInteractedRef.current) {
+        playBeep();
+      }
+
+      addToast(`Nova mensagem: ${data.phone}`);
+      notifyDesktop("Luna AI CRM", `Nova mensagem de ${data.phone}`);
+      loadConversations({ silent: true });
+    });
+
+    socket.on("conversation_updated", () => {
+      loadConversations({ silent: true });
+    });
+
+    socket.on("conversation_summary", () => {
+      loadConversations({ silent: true });
+    });
+
+    socket.on("appointment_confirmed", () => {
+      loadConversations({ silent: true });
+      loadAppointments();
+      addToast("Agenda atualizada");
+    });
+
+    socket.on("typing", (data) => {
+      setTypingPhones((prev) => ({
+        ...prev,
+        [data.phone]: data.typing
+      }));
+    });
+
+    const fallbackInterval = setInterval(() => {
+      if (!socket.connected) {
+        loadConversations({ silent: true });
+        loadAppointments();
+      }
+    }, 8000);
+
+    return () => {
+      clearInterval(fallbackInterval);
+      socket.disconnect();
+    };
   }, [session]);
 
   if (!session) {
@@ -487,7 +517,7 @@ function App() {
       <ToastArea toasts={toasts} />
 
       <div className="max-w-[1900px] mx-auto">
-        <div className="flex justify-between items-center mb-5">
+        <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-center mb-5">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center shadow-lg shadow-purple-500/20">
               <span className="text-2xl">☾</span>
@@ -498,7 +528,17 @@ function App() {
                 Luna AI CRM
               </h1>
 
-              <p className="text-zinc-400 text-sm">{session.user.email}</p>
+              <div className="flex items-center gap-2">
+                <p className="text-zinc-400 text-sm">{session.user.email}</p>
+                <span
+                  className={`w-2 h-2 rounded-full ${
+                    socketConnected ? "bg-green-400" : "bg-red-400"
+                  }`}
+                />
+                <span className="text-xs text-zinc-500">
+                  {socketConnected ? "Realtime ativo" : "Fallback ativo"}
+                </span>
+              </div>
             </div>
           </div>
 
@@ -510,7 +550,7 @@ function App() {
           </button>
         </div>
 
-        <div className="mb-5">
+        <div className="mb-4 grid grid-cols-1 lg:grid-cols-[1fr_220px] gap-3">
           <input
             type="text"
             placeholder="Buscar lead por nome, telefone ou observação..."
@@ -518,6 +558,11 @@ function App() {
             onChange={(e) => setSearch(e.target.value)}
             className="w-full bg-[#0b1023] border border-zinc-800 rounded-2xl px-4 py-3 text-sm outline-none focus:border-purple-500"
           />
+
+          <div className="bg-[#0b1023] border border-zinc-800 rounded-2xl px-4 py-3 text-sm text-zinc-400 flex items-center justify-between">
+            <span>Mensagens</span>
+            <strong className="text-white">{totalMessages}</strong>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
@@ -558,7 +603,7 @@ function App() {
           />
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 mb-6">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 mb-5">
           <DashboardChart title="Leads por Status" icon="▮">
             <ResponsiveContainer width="100%" height={180}>
               <BarChart
@@ -596,10 +641,9 @@ function App() {
                       data={revenueData}
                       dataKey="value"
                       nameKey="name"
-                      outerRadius={90}
-                      innerRadius={45}
+                      outerRadius={82}
+                      innerRadius={42}
                       paddingAngle={3}
-                      label
                     >
                       {revenueData.map((entry, index) => (
                         <Cell
@@ -618,17 +662,17 @@ function App() {
                       key={index}
                       className="flex items-center justify-between text-sm"
                     >
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
                         <span
-                          className="w-3 h-3 rounded-full"
+                          className="w-3 h-3 rounded-full shrink-0"
                           style={{
                             backgroundColor: COLORS[index % COLORS.length]
                           }}
                         />
-                        <span>{item.name}</span>
+                        <span className="truncate">{item.name}</span>
                       </div>
 
-                      <span className="text-zinc-300">
+                      <span className="text-zinc-300 ml-2">
                         {formatMoney(item.value)}
                       </span>
                     </div>
@@ -656,7 +700,9 @@ function App() {
                 replyMessage={replyMessage}
                 setReplyMessage={setReplyMessage}
                 sendManualMessage={sendManualMessage}
+                sendFollowUp={sendFollowUp}
                 search={search}
+                typingPhones={typingPhones}
               />
             ))}
           </div>
@@ -677,7 +723,9 @@ function Column({
   replyMessage,
   setReplyMessage,
   sendManualMessage,
-  search
+  sendFollowUp,
+  search,
+  typingPhones
 }) {
   const filtered = conversations
     .filter((item) => (item.status || "Novo Lead") === status)
@@ -685,8 +733,10 @@ function Column({
       const text = `
         ${item.phone}
         ${item.customer_name || ""}
+        ${item.profile_name || ""}
         ${item.notes || ""}
-        ${getLastMessageText(item)}
+        ${item.summary || ""}
+        ${getLastMessage(item)}
       `.toLowerCase();
 
       return text.includes(search.toLowerCase());
@@ -716,7 +766,7 @@ function Column({
             <span className="text-xl text-zinc-300">+</span>
           </div>
 
-          <div className="h-[345px] overflow-y-auto p-3 space-y-3">
+          <div className="h-[340px] overflow-y-auto p-3 space-y-3">
             {filtered.length === 0 && (
               <div className="h-full flex flex-col items-center justify-center text-center text-zinc-500">
                 <div className="text-3xl mb-3">▱</div>
@@ -743,26 +793,16 @@ function Column({
                   >
                     <div
                       {...provided.dragHandleProps}
-                      className="flex items-center justify-between mb-3 cursor-grab active:cursor-grabbing"
+                      className="flex items-start justify-between mb-3 cursor-grab active:cursor-grabbing"
                     >
                       <div className="flex items-center gap-2 min-w-0">
-                        <div className="relative shrink-0">
-                          <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-xs font-black shadow-lg shadow-purple-500/20">
-                            {getInitials(getClientName(conversation))}
-                          </div>
-
-                          <span
-                            className={`absolute -right-0.5 -bottom-0.5 w-3 h-3 rounded-full border-2 border-[#111827] ${
-                              isRecentlyActive(conversation)
-                                ? "bg-green-400 animate-pulse"
-                                : "bg-zinc-500"
-                            }`}
-                          />
-                        </div>
+                        <Avatar conversation={conversation} />
 
                         <div className="min-w-0">
                           <p className="font-bold text-sm truncate">
-                            {getClientName(conversation)}
+                            {conversation.customer_name ||
+                              conversation.profile_name ||
+                              "Cliente"}
                           </p>
 
                           <p className="text-[10px] text-zinc-400 truncate">
@@ -771,12 +811,14 @@ function Column({
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 shrink-0">
-                        {isWaitingForAI(conversation) && (
-                          <span className="bg-blue-500/20 text-blue-300 text-[10px] px-2 py-1 rounded-lg">
-                            IA...
-                          </span>
-                        )}
+                      <div className="flex items-center gap-2 ml-2">
+                        <span
+                          className={`w-2 h-2 rounded-full ${
+                            isRecentConversation(conversation)
+                              ? "bg-green-400 animate-pulse"
+                              : "bg-zinc-600"
+                          }`}
+                        />
 
                         <span className="bg-purple-500/30 text-purple-200 text-[10px] px-2 py-1 rounded-lg">
                           {conversation.history?.length || 0}
@@ -784,10 +826,44 @@ function Column({
                       </div>
                     </div>
 
+                    <div className="mb-3 rounded-xl bg-[#050816] border border-white/10 p-2">
+                      <div className="flex justify-between gap-2 mb-1">
+                        <p className="text-[10px] text-zinc-400">Última mensagem</p>
+                        <p className="text-[10px] text-zinc-500">
+                          {getLastMessageTime(conversation)}
+                        </p>
+                      </div>
+
+                      <p className="text-xs text-white line-clamp-2">
+                        {getLastMessage(conversation)}
+                      </p>
+
+                      {typingPhones[conversation.phone] && (
+                        <p className="text-[10px] text-purple-300 mt-2 animate-pulse">
+                          Luna está digitando...
+                        </p>
+                      )}
+                    </div>
+
+                    {conversation.summary && (
+                      <div className="mb-3 rounded-xl bg-purple-500/10 border border-purple-500/20 p-2">
+                        <p className="text-[10px] text-purple-300 mb-1">
+                          Resumo IA
+                        </p>
+                        <p className="text-xs text-zinc-200 line-clamp-2">
+                          {conversation.summary}
+                        </p>
+                      </div>
+                    )}
+
                     <input
                       className="w-full bg-[#050816] border border-white/10 rounded-lg p-2 mb-2 text-xs outline-none"
                       placeholder="Nome"
-                      defaultValue={conversation.customer_name || ""}
+                      defaultValue={
+                        conversation.customer_name ||
+                        conversation.profile_name ||
+                        ""
+                      }
                       onBlur={(e) =>
                         updateDetails(
                           conversation.phone,
@@ -844,45 +920,7 @@ function Column({
                       </div>
                     )}
 
-                    <div className="mb-2 rounded-xl bg-[#050816]/80 border border-white/10 p-2">
-                      <div className="flex items-center justify-between gap-2 mb-1">
-                        <p className="text-[10px] text-zinc-400">
-                          Última mensagem
-                        </p>
-
-                        <p className="text-[10px] text-zinc-500">
-                          {formatTime(getLastMessage(conversation)?.created_at)}
-                        </p>
-                      </div>
-
-                      <p className="text-xs text-white truncate">
-                        {getLastMessageText(conversation)}
-                      </p>
-                    </div>
-
-                    <div className="mb-2 grid grid-cols-1 gap-2">
-                      <div className="rounded-xl bg-purple-500/10 border border-purple-500/20 p-2">
-                        <p className="text-[10px] text-purple-300 font-bold mb-1">
-                          Resumo IA
-                        </p>
-
-                        <p className="text-[11px] text-zinc-300">
-                          {getConversationSummary(conversation)}
-                        </p>
-                      </div>
-
-                      <div className="rounded-xl bg-blue-500/10 border border-blue-500/20 p-2">
-                        <p className="text-[10px] text-blue-300 font-bold mb-1">
-                          Follow-up
-                        </p>
-
-                        <p className="text-[11px] text-zinc-300">
-                          {getFollowUpSuggestion(conversation)}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="h-28 overflow-y-auto space-y-2 pr-1 border-t border-white/10 pt-2">
+                    <div className="h-36 overflow-y-auto space-y-2 pr-1 border-t border-white/10 pt-2">
                       {[...(conversation.history || [])]
                         .reverse()
                         .map((msg, index) => (
@@ -915,6 +953,13 @@ function Column({
                         Enviar
                       </button>
                     </div>
+
+                    <button
+                      onClick={() => sendFollowUp(conversation.phone)}
+                      className="mt-2 w-full bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 text-purple-300 rounded-lg p-2 text-xs"
+                    >
+                      Enviar follow-up
+                    </button>
                   </div>
                 )}
               </Draggable>
@@ -929,6 +974,27 @@ function Column({
         </div>
       )}
     </Droppable>
+  );
+}
+
+function Avatar({ conversation }) {
+  if (conversation.profile_picture) {
+    return (
+      <img
+        src={conversation.profile_picture}
+        alt="Avatar"
+        className="w-9 h-9 rounded-full object-cover border border-white/10"
+      />
+    );
+  }
+
+  return (
+    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-xs font-bold shrink-0">
+      {getInitials(
+        conversation.customer_name || conversation.profile_name,
+        conversation.phone
+      )}
+    </div>
   );
 }
 
@@ -999,6 +1065,12 @@ function MessageBubble({ msg }) {
       </div>
 
       <p>{msg.content}</p>
+
+      {msg.type && msg.type !== "text" && (
+        <p className="text-[10px] text-purple-300 mt-1">
+          Mídia recebida: {msg.type}
+        </p>
+      )}
     </div>
   );
 }
