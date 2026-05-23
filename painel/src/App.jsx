@@ -540,6 +540,9 @@ function Appointments({ appointments }) {
             <p className="text-xs text-zinc-400">{item.phone}</p>
             <p className="text-xs mt-2">{item.service}</p>
             <p className="text-xs text-green-400">{item.appointment_date}</p>
+            <p className="text-xs text-emerald-400 font-bold">
+  R$ {Number(item.price || 0).toFixed(2)}
+</p>
           </div>
         ))}
       </div>
