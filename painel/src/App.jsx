@@ -554,6 +554,60 @@ function App() {
           />
         </div>
 
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-5">
+
+  <div className="bg-[#0b1023] border border-zinc-800 rounded-2xl p-4">
+    <p className="text-xs text-zinc-400">
+      Conversão
+    </p>
+
+    <p className="text-2xl font-black mt-2 text-green-400">
+      68%
+    </p>
+  </div>
+
+  <div className="bg-[#0b1023] border border-zinc-800 rounded-2xl p-4">
+    <p className="text-xs text-zinc-400">
+      Leads Ativos
+    </p>
+
+    <p className="text-2xl font-black mt-2 text-blue-400">
+      {conversations.length}
+    </p>
+  </div>
+
+  <div className="bg-[#0b1023] border border-zinc-800 rounded-2xl p-4">
+    <p className="text-xs text-zinc-400">
+      Receita Hoje
+    </p>
+
+    <p className="text-2xl font-black mt-2 text-emerald-400">
+      {formatMoney(totalRevenue / 30)}
+    </p>
+  </div>
+
+  <div className="bg-[#0b1023] border border-zinc-800 rounded-2xl p-4">
+    <p className="text-xs text-zinc-400">
+      Tempo Resposta
+    </p>
+
+    <p className="text-2xl font-black mt-2 text-yellow-400">
+      1.2m
+    </p>
+  </div>
+
+  <div className="bg-[#0b1023] border border-zinc-800 rounded-2xl p-4">
+    <p className="text-xs text-zinc-400">
+      Performance IA
+    </p>
+
+    <p className="text-2xl font-black mt-2 text-purple-400">
+      94%
+    </p>
+  </div>
+
+</div>
+
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mb-5">
           <ChartBox title="Leads por Status">
             <ResponsiveContainer
