@@ -146,6 +146,13 @@ function App() {
   const [search, setSearch] = useState("");
   const [typingPhones, setTypingPhones] = useState({});
   const [socketConnected, setSocketConnected] = useState(false);
+  const [avatarImages, setAvatarImages] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("luna_avatar_images") || "{}");
+    } catch {
+      return {};
+    }
+  });
 
   const lastMessageCountRef = useRef(0);
   const hasInteractedRef = useRef(false);
@@ -380,6 +387,42 @@ function App() {
 
     addToast("Follow-up enviado");
     await loadConversations({ silent: true });
+  }
+
+  function saveAvatarImage(phone, file) {
+    if (!file) return;
+
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      const image = reader.result;
+
+      setAvatarImages((prev) => {
+        const updated = {
+          ...prev,
+          [phone]: image
+        };
+
+        localStorage.setItem("luna_avatar_images", JSON.stringify(updated));
+        return updated;
+      });
+
+      addToast("Foto do cliente atualizada");
+    };
+
+    reader.readAsDataURL(file);
+  }
+
+  function removeAvatarImage(phone) {
+    setAvatarImages((prev) => {
+      const updated = { ...prev };
+      delete updated[phone];
+
+      localStorage.setItem("luna_avatar_images", JSON.stringify(updated));
+      return updated;
+    });
+
+    addToast("Foto removida");
   }
 
   async function handleDragEnd(result) {
@@ -703,6 +746,9 @@ function App() {
                 sendFollowUp={sendFollowUp}
                 search={search}
                 typingPhones={typingPhones}
+                avatarImages={avatarImages}
+                saveAvatarImage={saveAvatarImage}
+                removeAvatarImage={removeAvatarImage}
               />
             ))}
           </div>
@@ -725,21 +771,31 @@ function Column({
   sendManualMessage,
   sendFollowUp,
   search,
-  typingPhones
+  typingPhones,
+  avatarImages,
+  saveAvatarImage,
+  removeAvatarImage
 }) {
   const filtered = conversations
     .filter((item) => (item.status || "Novo Lead") === status)
     .filter((item) => {
-      const text = `
-        ${item.phone}
-        ${item.customer_name || ""}
-        ${item.profile_name || ""}
-        ${item.notes || ""}
-        ${item.summary || ""}
-        ${getLastMessage(item)}
-      `.toLowerCase();
+      const searchText = search.trim().toLowerCase();
 
-      return text.includes(search.toLowerCase());
+      if (!searchText) return true;
+
+      const values = [
+        item.phone,
+        item.customer_name,
+        item.profile_name,
+        item.notes,
+        item.summary,
+        getLastMessage(item)
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return values.includes(searchText);
     })
     .reverse();
 
@@ -796,7 +852,10 @@ function Column({
                       className="flex items-start justify-between mb-3 cursor-grab active:cursor-grabbing"
                     >
                       <div className="flex items-center gap-2 min-w-0">
-                        <Avatar conversation={conversation} />
+                        <Avatar
+                          conversation={conversation}
+                          avatarImage={avatarImages[conversation.phone]}
+                        />
 
                         <div className="min-w-0">
                           <p className="font-bold text-sm truncate">
@@ -855,6 +914,30 @@ function Column({
                         </p>
                       </div>
                     )}
+
+                    <div className="grid grid-cols-2 gap-2 mb-2">
+                      <label className="bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 text-purple-300 rounded-lg p-2 text-xs text-center cursor-pointer">
+                        Foto
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) =>
+                            saveAvatarImage(
+                              conversation.phone,
+                              e.target.files?.[0]
+                            )
+                          }
+                        />
+                      </label>
+
+                      <button
+                        onClick={() => removeAvatarImage(conversation.phone)}
+                        className="bg-zinc-500/10 hover:bg-zinc-500/20 border border-zinc-500/20 text-zinc-300 rounded-lg p-2 text-xs"
+                      >
+                        Remover foto
+                      </button>
+                    </div>
 
                     <input
                       className="w-full bg-[#050816] border border-white/10 rounded-lg p-2 mb-2 text-xs outline-none"
@@ -977,11 +1060,13 @@ function Column({
   );
 }
 
-function Avatar({ conversation }) {
-  if (conversation.profile_picture) {
+function Avatar({ conversation, avatarImage }) {
+  const image = avatarImage || conversation.profile_picture;
+
+  if (image) {
     return (
       <img
-        src={conversation.profile_picture}
+        src={image}
         alt="Avatar"
         className="w-9 h-9 rounded-full object-cover border border-white/10"
       />
