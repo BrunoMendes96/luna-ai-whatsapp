@@ -716,7 +716,7 @@ function Column({
         <div
           ref={provided.innerRef}
           {...provided.droppableProps}
-          className="bg-[#0b1023] border border-zinc-800 rounded-3xl h-[650px] overflow-hidden"
+          className="bg-[#0b1023] border border-zinc-800 rounded-3xl h-[460px] overflow-hidden"
         >
           <div className="flex justify-between items-center p-4 border-b border-white/10">
             <h2 className="font-bold">
@@ -728,7 +728,7 @@ function Column({
             </span>
           </div>
 
-          <div className="h-[580px] overflow-y-auto p-3 space-y-3">
+          <div className="h-[390px] overflow-y-auto p-3 space-y-3">
             {filtered.map(
               (conversation, index) => (
                 <Draggable
@@ -918,7 +918,7 @@ function Column({
                       </div>
 
                       <div
-                        className="h-40 overflow-y-auto border-t border-white/10 pt-2 space-y-2"
+                        className="h-24 overflow-y-auto border-t border-white/10 pt-2 space-y-2"
                         onClick={() =>
                           markAsRead(
                             conversation.phone
