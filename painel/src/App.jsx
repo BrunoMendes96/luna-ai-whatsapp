@@ -823,6 +823,11 @@ function Column({
                         </div>
                       )}
 
+<div className="mb-2 bg-[#050816] border border-white/10 rounded-lg p-2">
+  <p className="text-[10px] text-zinc-400">Responsável</p>
+  <p className="text-xs text-purple-300 font-bold">Admin</p>
+</div>
+
                       <input
                         className="w-full bg-[#050816] border border-white/10 rounded-lg p-2 mb-2 text-xs"
                         placeholder="Nome"
