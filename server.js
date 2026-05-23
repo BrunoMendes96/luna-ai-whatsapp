@@ -32,6 +32,7 @@ const supabase = createClient(
 );
 
 const processedMessages = new Set();
+const DEFAULT_COMPANY_ID = "default_company";
 
 io.on("connection", (socket) => {
   console.log("Painel conectado:", socket.id);
@@ -97,6 +98,7 @@ async function saveMessage(phone, role, content, extra = {}) {
   const { data, error } = await supabase
     .from("conversations")
     .insert({
+      company_id: DEFAULT_COMPANY_ID,
       phone,
       role,
       content,
@@ -131,6 +133,7 @@ async function getHistory(phone) {
   const { data } = await supabase
     .from("conversations")
     .select("role, content")
+    .eq("company_id", DEFAULT_COMPANY_ID)
     .eq("phone", phone)
     .order("created_at", {
       ascending: true
@@ -160,6 +163,7 @@ ${JSON.stringify(history)}
   await supabase
     .from("conversations")
     .update({
+      company_id: DEFAULT_COMPANY_ID,
       summary
     })
     .eq("phone", phone);
@@ -195,6 +199,7 @@ ${JSON.stringify(history)}
   await supabase
     .from("conversations")
     .update({
+      company_id: DEFAULT_COMPANY_ID,
       ai_suggestion: suggestion
     })
     .eq("phone", phone);
@@ -331,6 +336,7 @@ app.post("/api/conversations/status", async (req, res) => {
   await supabase
     .from("conversations")
     .update({ status })
+    .eq("company_id", DEFAULT_COMPANY_ID)
     .eq("phone", phone);
 
   emitRealtime("conversation_updated", {
@@ -347,6 +353,7 @@ app.post("/api/conversations/details", async (req, res) => {
   await supabase
     .from("conversations")
     .update({
+      company_id: DEFAULT_COMPANY_ID,
       customer_name,
       notes
     })
@@ -365,6 +372,7 @@ app.post("/api/conversations/tags", async (req, res) => {
   await supabase
     .from("conversations")
     .update({
+      company_id: DEFAULT_COMPANY_ID,
       tags
     })
     .eq("phone", phone);
@@ -383,6 +391,7 @@ app.post("/api/conversations/read", async (req, res) => {
   await supabase
     .from("conversations")
     .update({
+      company_id: DEFAULT_COMPANY_ID,
       unread_count: 0
     })
     .eq("phone", phone);
@@ -511,6 +520,7 @@ ${userText}
       await supabase
         .from("conversations")
         .update({
+          company_id: DEFAULT_COMPANY_ID,
           status: "Aguardando Confirmação"
         })
         .eq("phone", from);
@@ -582,15 +592,15 @@ Pode me enviar outro dia ou horário que eu verifico para você?`;
 
     const { error } = await supabase
       .from("appointments")
-      .insert({
-        customer_name,
-        phone,
-        service,
-        appointment_date,
-        price: Number(price || 0),
-        confirmed: true
-      });
-
+.insert({
+  company_id: DEFAULT_COMPANY_ID,
+  customer_name,
+  phone,
+  service,
+  appointment_date,
+  price: Number(price || 0),
+  confirmed: true
+});
     if (error) {
       return res.status(500).json({
         error: error.message
@@ -600,6 +610,7 @@ Pode me enviar outro dia ou horário que eu verifico para você?`;
     await supabase
       .from("conversations")
       .update({
+        company_id: DEFAULT_COMPANY_ID,
         status: "Fechado",
         customer_name,
         unread_count: 0
