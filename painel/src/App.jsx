@@ -793,6 +793,15 @@ function Column({
                             conversation
                           )}
                         </p>
+                        <div className="flex items-center gap-2 mt-2">
+  <span className="text-[10px] px-2 py-1 rounded-full bg-red-500/20 text-red-300">
+    🔴 Quente
+  </span>
+
+  <span className="text-[10px] text-zinc-500">
+    Alta chance de conversão
+  </span>
+</div>
                       </div>
 
                       {conversation.summary && (
