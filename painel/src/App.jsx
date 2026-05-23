@@ -53,13 +53,16 @@ function App() {
   });
 
   const [email, setEmail] = useState(localStorage.getItem("saved_email") || "");
-  const [password, setPassword] = useState(localStorage.getItem("saved_password") || "");
+  const [password, setPassword] = useState(
+    localStorage.getItem("saved_password") || ""
+  );
   const [remember, setRemember] = useState(true);
 
   const [conversations, setConversations] = useState([]);
   const [appointments, setAppointments] = useState([]);
-  const [selectedConversation, setSelectedConversation] = useState(null);
+  const [replyMessage, setReplyMessage] = useState({});
   const [toasts, setToasts] = useState([]);
+  const [selectedPhone, setSelectedPhone] = useState(null);
 
   const lastMessageCountRef = useRef(0);
   const hasInteractedRef = useRef(false);
@@ -81,7 +84,11 @@ function App() {
       email.trim().toLowerCase() === "bruno.coop32@icloud.com" &&
       password.trim() === "jaftYw-nirke9-dibsab"
     ) {
-      const adminSession = { user: { email: "bruno.coop32@icloud.com" } };
+      const adminSession = {
+        user: {
+          email: "bruno.coop32@icloud.com"
+        }
+      };
 
       localStorage.setItem("luna_admin", JSON.stringify(adminSession));
 
@@ -111,6 +118,10 @@ function App() {
       const data = await response.json();
 
       setConversations(data);
+
+      if (!selectedPhone && data.length > 0) {
+        setSelectedPhone(data[data.length - 1].phone);
+      }
 
       const totalMessages = data.reduce((total, conversation) => {
         return total + (conversation.history?.length || 0);
@@ -246,7 +257,7 @@ function App() {
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [session]);
+  }, [session, selectedPhone]);
 
   if (!session) {
     return (
@@ -290,6 +301,10 @@ function App() {
     );
   }
 
+  const selectedConversation =
+    conversations.find((conversation) => conversation.phone === selectedPhone) ||
+    conversations[conversations.length - 1];
+
   return (
     <div
       className="min-h-screen bg-zinc-950 text-white p-4"
@@ -299,7 +314,7 @@ function App() {
     >
       <ToastArea toasts={toasts} />
 
-      <div className="max-w-[1800px] mx-auto">
+      <div className="max-w-[1900px] mx-auto">
         <div className="flex justify-between items-center mb-5">
           <div>
             <h1 className="text-3xl font-bold">Luna AI CRM</h1>
@@ -314,110 +329,37 @@ function App() {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-[420px_1fr] gap-4">
-          {STATUS_OPTIONS.map((status) => (
-            <Column
-              key={status}
-              status={status}
-              conversations={conversations}
-              updateStatus={updateStatus}
-              updateDetails={updateDetails}
-              confirmAppointment={confirmAppointment}
-              replyMessage={replyMessage}
-              setReplyMessage={setReplyMessage}
-              sendManualMessage={sendManualMessage}
-              selectedConversation={selectedConversation}
-              setSelectedConversation={setSelectedConversation}
-            />
-          ))}
-
-<div className="bg-zinc-900 border border-zinc-800 rounded-2xl h-[680px] flex flex-col overflow-hidden">
-  {selectedConversation ? (
-    <>
-      <div className="border-b border-zinc-800 p-4">
-        <h2 className="text-xl font-bold">
-          {selectedConversation.customer_name || "Cliente"}
-        </h2>
-
-        <p className="text-zinc-400 text-sm">
-          {selectedConversation.phone}
-        </p>
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
-        {[...(selectedConversation.history || [])]
-          .reverse()
-          .map((msg, index) => (
-            <MessageBubble key={index} msg={msg} />
-          ))}
-      </div>
-
-      <div className="border-t border-zinc-800 p-4 flex gap-2">
-        <input
-          className="flex-1 bg-zinc-800 rounded-xl p-3 text-sm"
-          placeholder="Responder cliente..."
-          value={replyMessage[selectedConversation.phone] || ""}
-          onChange={(e) =>
-            setReplyMessage((prev) => ({
-              ...prev,
-              [selectedConversation.phone]: e.target.value
-            }))
-          }
-        />
-
-        <button
-          onClick={() =>
-            sendManualMessage(selectedConversation.phone)
-          }
-          className="bg-blue-500/20 text-blue-400 px-5 rounded-xl"
-        >
-          Enviar
-        </button>
-      </div>
-    </>
-  ) : (
-    <div className="flex items-center justify-center h-full text-zinc-500">
-      Selecione uma conversa
-    </div>
-  )}
-</div>
-
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 h-[680px] overflow-y-auto">
-            <h2 className="text-xl font-bold mb-4">Agendamentos</h2>
-
-            <div className="space-y-3">
-              {appointments.map((item) => (
-                <div key={item.id} className="bg-zinc-800 rounded-xl p-3">
-                  <p className="font-bold text-sm">
-                    {item.customer_name || "Cliente"}
-                  </p>
-                  <p className="text-xs text-zinc-400">{item.phone}</p>
-                  <p className="text-xs mt-2">{item.service}</p>
-                  <p className="text-xs text-green-400">
-                    {item.appointment_date}
-                  </p>
-                </div>
-              ))}
-            </div>
+        <div className="grid grid-cols-1 xl:grid-cols-[1.1fr_1fr_320px] gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {STATUS_OPTIONS.map((status) => (
+              <Column
+                key={status}
+                status={status}
+                conversations={conversations}
+                selectedPhone={selectedPhone}
+                setSelectedPhone={setSelectedPhone}
+              />
+            ))}
           </div>
+
+          <ChatPanel
+            conversation={selectedConversation}
+            updateStatus={updateStatus}
+            updateDetails={updateDetails}
+            confirmAppointment={confirmAppointment}
+            replyMessage={replyMessage}
+            setReplyMessage={setReplyMessage}
+            sendManualMessage={sendManualMessage}
+          />
+
+          <Appointments appointments={appointments} />
         </div>
       </div>
     </div>
   );
 }
 
-function Column({
-  selectedConversation,
-setSelectedConversation,
-  status,
-  conversations,
-  updateStatus,
-  updateDetails,
-  confirmAppointment,
-  replyMessage,
-  setReplyMessage,
-  sendManualMessage
-}) {
+function Column({ status, conversations, selectedPhone, setSelectedPhone }) {
   const filtered = conversations
     .filter((item) => (item.status || "Novo Lead") === status)
     .reverse();
@@ -431,15 +373,21 @@ setSelectedConversation,
         </span>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-3">
         {filtered.map((conversation) => (
-          <div
-  key={conversation.phone}
-  onClick={() => setSelectedConversation(conversation)}
-  className="bg-zinc-800 rounded-2xl p-3 cursor-pointer hover:bg-zinc-700 transition"
->
-            <div className="flex items-center justify-between mb-3">
-              <p className="font-bold text-sm">{conversation.phone}</p>
+          <button
+            key={conversation.phone}
+            onClick={() => setSelectedPhone(conversation.phone)}
+            className={`w-full text-left rounded-2xl p-3 transition ${
+              selectedPhone === conversation.phone
+                ? "bg-blue-500/20 border border-blue-500/40"
+                : "bg-zinc-800 hover:bg-zinc-700 border border-transparent"
+            }`}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <p className="font-bold text-sm">
+                {conversation.customer_name || "Cliente"}
+              </p>
 
               {(conversation.status || "Novo Lead") === "Novo Lead" && (
                 <span className="bg-green-500/20 text-green-400 text-[10px] px-2 py-1 rounded-full">
@@ -448,90 +396,160 @@ setSelectedConversation,
               )}
             </div>
 
-            <input
-              className="w-full bg-zinc-900 rounded-lg p-2 mb-2 text-sm"
-              placeholder="Nome"
-              defaultValue={conversation.customer_name || ""}
-              onBlur={(e) =>
-                updateDetails(
-                  conversation.phone,
-                  e.target.value,
-                  conversation.notes || ""
-                )
-              }
-            />
+            <p className="text-xs text-zinc-400">{conversation.phone}</p>
 
-            <textarea
-              className="w-full bg-zinc-900 rounded-lg p-2 mb-2 text-sm h-14"
-              placeholder="Observações"
-              defaultValue={conversation.notes || ""}
-              onBlur={(e) =>
-                updateDetails(
-                  conversation.phone,
-                  conversation.customer_name || "",
-                  e.target.value
-                )
-              }
-            />
+            <p className="text-xs text-zinc-500 mt-3 line-clamp-2">
+              {conversation.history?.[conversation.history.length - 1]
+                ?.content || "Sem mensagens"}
+            </p>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
-            <select
-              className="w-full bg-zinc-900 rounded-lg p-2 mb-2 text-sm"
-              value={conversation.status || "Novo Lead"}
-              onChange={(e) => updateStatus(conversation.phone, e.target.value)}
+function ChatPanel({
+  conversation,
+  updateStatus,
+  updateDetails,
+  confirmAppointment,
+  replyMessage,
+  setReplyMessage,
+  sendManualMessage
+}) {
+  if (!conversation) {
+    return (
+      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl h-[680px] flex items-center justify-center text-zinc-500">
+        Selecione uma conversa
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl h-[680px] flex flex-col overflow-hidden">
+      <div className="border-b border-zinc-800 p-4">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-full bg-blue-500/30 text-blue-300 flex items-center justify-center font-bold">
+            C
+          </div>
+
+          <div>
+            <h2 className="text-xl font-bold">
+              {conversation.customer_name || "Cliente"}
+            </h2>
+            <p className="text-zinc-400 text-sm">{conversation.phone}</p>
+          </div>
+        </div>
+
+        <input
+          className="w-full bg-zinc-800 rounded-lg p-2 mb-2 text-sm"
+          placeholder="Nome"
+          defaultValue={conversation.customer_name || ""}
+          onBlur={(e) =>
+            updateDetails(
+              conversation.phone,
+              e.target.value,
+              conversation.notes || ""
+            )
+          }
+        />
+
+        <textarea
+          className="w-full bg-zinc-800 rounded-lg p-2 mb-2 text-sm h-14"
+          placeholder="Observações"
+          defaultValue={conversation.notes || ""}
+          onBlur={(e) =>
+            updateDetails(
+              conversation.phone,
+              conversation.customer_name || "",
+              e.target.value
+            )
+          }
+        />
+
+        <select
+          className="w-full bg-zinc-800 rounded-lg p-2 text-sm"
+          value={conversation.status || "Novo Lead"}
+          onChange={(e) => updateStatus(conversation.phone, e.target.value)}
+        >
+          {STATUS_OPTIONS.map((item) => (
+            <option key={item} value={item}>
+              {item}
+            </option>
+          ))}
+        </select>
+
+        {(conversation.status || "").includes("Aguardando") && (
+          <div className="grid grid-cols-2 gap-2 mt-3">
+            <button
+              onClick={() => confirmAppointment(conversation)}
+              className="bg-green-500/20 text-green-400 rounded-lg p-2 text-sm"
             >
-              {STATUS_OPTIONS.map((item) => (
-                <option key={item} value={item}>
-                  {item}
-                </option>
-              ))}
-            </select>
+              Confirmar
+            </button>
 
-            {(conversation.status || "").includes("Aguardando") && (
-              <div className="grid grid-cols-2 gap-2 mb-3">
-                <button
-                  onClick={() => confirmAppointment(conversation)}
-                  className="bg-green-500/20 text-green-400 rounded-lg p-2 text-sm"
-                >
-                  Confirmar
-                </button>
+            <button
+              onClick={() => updateStatus(conversation.phone, "Perdido")}
+              className="bg-red-500/20 text-red-400 rounded-lg p-2 text-sm"
+            >
+              Cancelar
+            </button>
+          </div>
+        )}
+      </div>
 
-                <button
-                  onClick={() => updateStatus(conversation.phone, "Perdido")}
-                  className="bg-red-500/20 text-red-400 rounded-lg p-2 text-sm"
-                >
-                  Cancelar
-                </button>
-              </div>
-            )}
+      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        {[...(conversation.history || [])].reverse().map((msg, index) => (
+          <MessageBubble key={index} msg={msg} />
+        ))}
+      </div>
 
-            <div className="h-64 overflow-y-auto space-y-2 pr-1 border-t border-zinc-700 pt-3">
-              {[...(conversation.history || [])]
-                .reverse()
-                .map((msg, index) => (
-                  <MessageBubble key={index} msg={msg} />
-                ))}
-            </div>
+      <div className="border-t border-zinc-800 p-4 flex gap-2">
+        <input
+          className="flex-1 bg-zinc-800 rounded-xl p-3 text-sm"
+          placeholder="Responder cliente..."
+          value={replyMessage[conversation.phone] || ""}
+          onChange={(e) =>
+            setReplyMessage((prev) => ({
+              ...prev,
+              [conversation.phone]: e.target.value
+            }))
+          }
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              sendManualMessage(conversation.phone);
+            }
+          }}
+        />
 
-            <div className="mt-3 flex gap-2">
-              <input
-                className="flex-1 bg-zinc-900 rounded-lg p-2 text-sm"
-                placeholder="Responder..."
-                value={replyMessage[conversation.phone] || ""}
-                onChange={(e) =>
-                  setReplyMessage((prev) => ({
-                    ...prev,
-                    [conversation.phone]: e.target.value
-                  }))
-                }
-              />
+        <button
+          onClick={() => sendManualMessage(conversation.phone)}
+          className="bg-blue-500/20 text-blue-400 px-5 rounded-xl"
+        >
+          Enviar
+        </button>
+      </div>
+    </div>
+  );
+}
 
-              <button
-                onClick={() => sendManualMessage(conversation.phone)}
-                className="bg-blue-500/20 text-blue-400 px-3 rounded-lg text-sm"
-              >
-                Enviar
-              </button>
-            </div>
+function Appointments({ appointments }) {
+  return (
+    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 h-[680px] overflow-y-auto">
+      <h2 className="text-xl font-bold mb-4">Agendamentos</h2>
+
+      <div className="space-y-3">
+        {appointments.map((item) => (
+          <div key={item.id} className="bg-zinc-800 rounded-xl p-3">
+            <p className="font-bold text-sm">
+              {item.customer_name || "Cliente"}
+            </p>
+            <p className="text-xs text-zinc-400">{item.phone}</p>
+            <p className="text-xs mt-2">{item.service}</p>
+            <p className="text-xs text-green-400">
+              {item.appointment_date}
+            </p>
           </div>
         ))}
       </div>
@@ -544,9 +562,9 @@ function MessageBubble({ msg }) {
 
   return (
     <div
-      className={`rounded-xl p-2 text-sm border ${
+      className={`rounded-xl p-3 text-sm border ${
         isClient
-          ? "bg-zinc-700 border-zinc-600"
+          ? "bg-zinc-800 border-zinc-700"
           : "bg-green-500/20 border-green-500/20"
       }`}
     >
@@ -583,7 +601,7 @@ function ToastArea({ toasts }) {
       {toasts.map((toast) => (
         <div
           key={toast.id}
-          className="bg-zinc-900 border border-zinc-700 text-white rounded-2xl px-5 py-4 shadow-2xl animate-pulse"
+          className="bg-zinc-900 border border-zinc-700 text-white rounded-2xl px-5 py-4 shadow-2xl"
         >
           <p className="font-bold text-sm">Luna AI CRM</p>
           <p className="text-zinc-300 text-sm">{toast.message}</p>
