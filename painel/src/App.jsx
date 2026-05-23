@@ -10,28 +10,26 @@ const STATUS_OPTIONS = [
   "Perdido"
 ];
 
+const notificationSound = new Audio(
+  "https://actions.google.com/sounds/v1/cartoon/pop.ogg"
+);
+
 function App() {
   const [session, setSession] = useState(() => {
     const saved = localStorage.getItem("luna_admin");
     return saved ? JSON.parse(saved) : null;
   });
 
-  const [email, setEmail] = useState(
-  localStorage.getItem("saved_email") || ""
-);
+  const [email, setEmail] = useState(localStorage.getItem("saved_email") || "");
+  const [password, setPassword] = useState(
+    localStorage.getItem("saved_password") || ""
+  );
+  const [remember, setRemember] = useState(true);
 
-const [password, setPassword] = useState(
-  localStorage.getItem("saved_password") || ""
-);
-
-const [remember, setRemember] = useState(true);
   const [conversations, setConversations] = useState([]);
   const [appointments, setAppointments] = useState([]);
   const lastMessageCountRef = useRef(0);
-
-const notificationSound = new Audio(
-  "https://actions.google.com/sounds/v1/cartoon/pop.ogg"
-);
+  const hasInteractedRef = useRef(false);
 
   function login(e) {
     e.preventDefault();
@@ -41,11 +39,17 @@ const notificationSound = new Audio(
       password.trim() === "jaftYw-nirke9-dibsab"
     ) {
       const adminSession = { user: { email: "bruno.coop32@icloud.com" } };
+
       localStorage.setItem("luna_admin", JSON.stringify(adminSession));
+
       if (remember) {
-  localStorage.setItem("saved_email", email);
-  localStorage.setItem("saved_password", password);
-}
+        localStorage.setItem("saved_email", email);
+        localStorage.setItem("saved_password", password);
+      } else {
+        localStorage.removeItem("saved_email");
+        localStorage.removeItem("saved_password");
+      }
+
       setSession(adminSession);
       return;
     }
@@ -59,63 +63,50 @@ const notificationSound = new Audio(
   }
 
   async function loadConversations() {
-    const response = await fetch(`${API_URL}/api/conversations`);
-    const data = await response.json();
-    setConversations(data);
-    const totalMessages = data.reduce((total, conversation) => {
-  return total + (conversation.history?.length || 0);
-}, 0);
+    try {
+      const response = await fetch(`${API_URL}/api/conversations`);
+      const data = await response.json();
 
-if (
-  lastMessageCountRef.current !== 0 &&
-  totalMessages > lastMessageCountRef.current
-) {
-  alert("Nova mensagem recebida!");
+      setConversations(data);
 
-  try {
-    notificationSound.play();
-  } catch (error) {
-    console.log("Som bloqueado:", error.message);
-  }
-}
+      const totalMessages = data.reduce((total, conversation) => {
+        return total + (conversation.history?.length || 0);
+      }, 0);
 
-lastMessageCountRef.current = totalMessages;
-    const totalMessages = data.reduce((total, conversation) => {
-  return total + (conversation.history?.length || 0);
-}, 0);
+      if (
+        lastMessageCountRef.current !== 0 &&
+        totalMessages > lastMessageCountRef.current
+      ) {
+        if (hasInteractedRef.current) {
+          try {
+            notificationSound.currentTime = 0;
+            notificationSound.play();
+          } catch (error) {
+            console.log("Som bloqueado:", error.message);
+          }
+        }
 
-if (lastMessageCount !== 0 && totalMessages > lastMessageCount) {
-  try {
-    notificationSound.play();
-  } catch (error) {
-    console.log("Som bloqueado pelo navegador:", error.message);
-  }
+        if ("Notification" in window && Notification.permission === "granted") {
+          new Notification("Nova mensagem recebida", {
+            body: "Chegou uma nova mensagem no Luna AI CRM."
+          });
+        }
+      }
 
-  if ("Notification" in window && Notification.permission === "granted") {
-    new Notification("Nova mensagem recebida", {
-      body: "Chegou uma nova mensagem no Luna AI CRM."
-    });
-  }
-}
-
-setLastMessageCount(totalMessages);
-    if (lastCount !== 0 && data.length > lastCount) {
-  notificationSound.play();
-
-  if (Notification.permission === "granted") {
-    new Notification("Nova conversa recebida", {
-      body: "Você recebeu uma nova mensagem no CRM."
-    });
-  }
-}
-
-setLastCount(data.length);
+      lastMessageCountRef.current = totalMessages;
+    } catch (error) {
+      console.error(error);
+    }
   }
 
   async function loadAppointments() {
-    const response = await fetch(`${API_URL}/api/appointments`);
-    const data = await response.json();
-    setAppointments(data);
+    try {
+      const response = await fetch(`${API_URL}/api/appointments`);
+      const data = await response.json();
+      setAppointments(data);
+    } catch (error) {
+      console.error(error);
+    }
   }
 
   async function updateStatus(phone, status) {
@@ -125,7 +116,7 @@ setLastCount(data.length);
       body: JSON.stringify({ phone, status })
     });
 
-    loadConversations();
+    await loadConversations();
   }
 
   async function updateDetails(phone, customer_name, notes) {
@@ -135,7 +126,7 @@ setLastCount(data.length);
       body: JSON.stringify({ phone, customer_name, notes })
     });
 
-    loadConversations();
+    await loadConversations();
   }
 
   async function confirmAppointment(conversation) {
@@ -163,15 +154,16 @@ setLastCount(data.length);
     }
 
     alert("Agendamento confirmado!");
-    loadConversations();
-    loadAppointments();
+    await loadConversations();
+    await loadAppointments();
   }
 
   useEffect(() => {
-    if ("Notification" in window && Notification.permission !== "granted") {
-  Notification.requestPermission();
-}
     if (!session) return;
+
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
 
     loadConversations();
     loadAppointments();
@@ -187,8 +179,12 @@ setLastCount(data.length);
   if (!session) {
     return (
       <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center p-6">
-        <form onSubmit={login} className="bg-zinc-900 p-8 rounded-2xl w-full max-w-sm">
-          <h1 className="text-3xl font-bold mb-6">Luna AI</h1>
+        <form
+          onSubmit={login}
+          className="bg-zinc-900 p-8 rounded-2xl w-full max-w-sm border border-zinc-800"
+        >
+          <h1 className="text-3xl font-bold mb-2">Luna AI</h1>
+          <p className="text-zinc-400 text-sm mb-6">Painel administrativo</p>
 
           <input
             className="w-full bg-zinc-800 p-3 rounded-xl mb-3"
@@ -198,24 +194,21 @@ setLastCount(data.length);
           />
 
           <input
-            className="w-full bg-zinc-800 p-3 rounded-xl mb-5"
+            className="w-full bg-zinc-800 p-3 rounded-xl mb-4"
             placeholder="Senha"
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
 
-<div className="flex items-center gap-2 mb-5">
-  <input
-    type="checkbox"
-    checked={remember}
-    onChange={(e) => setRemember(e.target.checked)}
-  />
-
-  <p className="text-sm text-zinc-400">
-    Lembrar acesso
-  </p>
-</div>
+          <label className="flex items-center gap-2 mb-5 text-sm text-zinc-400">
+            <input
+              type="checkbox"
+              checked={remember}
+              onChange={(e) => setRemember(e.target.checked)}
+            />
+            Lembrar acesso
+          </label>
 
           <button className="w-full bg-white text-black p-3 rounded-xl font-bold">
             Entrar
@@ -226,7 +219,12 @@ setLastCount(data.length);
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white p-4">
+    <div
+      className="min-h-screen bg-zinc-950 text-white p-4"
+      onClick={() => {
+        hasInteractedRef.current = true;
+      }}
+    >
       <div className="max-w-[1800px] mx-auto">
         <div className="flex justify-between items-center mb-5">
           <div>
@@ -265,7 +263,9 @@ setLastCount(data.length);
                   </p>
                   <p className="text-xs text-zinc-400">{item.phone}</p>
                   <p className="text-xs mt-2">{item.service}</p>
-                  <p className="text-xs text-green-400">{item.appointment_date}</p>
+                  <p className="text-xs text-green-400">
+                    {item.appointment_date}
+                  </p>
                 </div>
               ))}
             </div>
@@ -299,9 +299,15 @@ function Column({
       <div className="space-y-4">
         {filtered.map((conversation) => (
           <div key={conversation.phone} className="bg-zinc-800 rounded-2xl p-3">
-            <p className="font-bold text-sm mb-3">
-  {conversation.phone}
-</p>
+            <div className="flex items-center justify-between mb-3">
+              <p className="font-bold text-sm">{conversation.phone}</p>
+
+              {(conversation.status || "Novo Lead") === "Novo Lead" && (
+                <span className="bg-green-500/20 text-green-400 text-[10px] px-2 py-1 rounded-full">
+                  NOVO
+                </span>
+              )}
+            </div>
 
             <input
               className="w-full bg-zinc-900 rounded-lg p-2 mb-2 text-sm"
@@ -366,9 +372,7 @@ function Column({
                   <div
                     key={index}
                     className={`rounded-xl p-2 text-sm ${
-                      msg.role === "user"
-                        ? "bg-zinc-700"
-                        : "bg-green-500/20"
+                      msg.role === "user" ? "bg-zinc-700" : "bg-green-500/20"
                     }`}
                   >
                     <p className="text-[10px] text-zinc-400 mb-1">
