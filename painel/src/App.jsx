@@ -161,6 +161,14 @@ function App() {
 
   const currentUser = session?.user || null;
 
+  useEffect(() => {
+    if (!("Notification" in window)) return;
+
+    if (Notification.permission === "default") {
+      Notification.requestPermission().catch(() => {});
+    }
+  }, []);
+
   const visibleConversations = useMemo(() => {
     if (!currentUser) return [];
     if (isAdmin(currentUser)) return conversations;
@@ -527,8 +535,23 @@ function App() {
     socket.on("disconnect", () => setSocketConnected(false));
 
     socket.on("new_message", (data) => {
-      if (interactedRef.current) playBeep();
-      addToast(`Nova mensagem: ${data.phone || "cliente"}`);
+      if (interactedRef.current) {
+        playBeep();
+      }
+
+      const messageText = data?.content || "Nova mensagem recebida";
+      addToast(`Nova mensagem: ${data?.phone || "cliente"}`);
+
+      if (
+        data?.role === "user" &&
+        "Notification" in window &&
+        Notification.permission === "granted"
+      ) {
+        new Notification("Novo lead no WhatsApp", {
+          body: messageText
+        });
+      }
+
       loadConversations({ silent: true });
     });
 
@@ -1023,58 +1046,37 @@ function LeadPanel({
   const isOnline = Boolean(onlineUsers[conversation.phone]);
   const admin = isAdmin(currentUser);
 
-async function handleFileUpload(
-  event,
-  phone
-) {
+async function handleFileUpload(event, phone) {
   try {
-    const file =
-      event.target.files?.[0];
+    const file = event.target.files?.[0];
 
     if (!file) return;
 
-    const formData =
-      new FormData();
+    const formData = new FormData();
 
-    formData.append(
-      "file",
-      file
-    );
+    formData.append("file", file);
+    formData.append("phone", phone);
 
-    formData.append(
-      "phone",
-      phone
-    );
+    const response = await fetch(`${API_URL}/api/send-media`, {
+      method: "POST",
+      body: formData
+    });
 
-    const response =
-      await fetch(
-        `${API_URL}/api/send-media`,
-        {
-          method: "POST",
-          body: formData
-        }
-      );
-
-    const data =
-      await response.json();
+    const contentType = response.headers.get("content-type") || "";
+    const data = contentType.includes("application/json")
+      ? await response.json()
+      : { error: await response.text() };
 
     if (!response.ok) {
-      alert(
-        data.error ||
-          "Erro ao enviar mídia"
-      );
+      alert(data.error || "Erro ao enviar mídia");
       return;
     }
 
-    alert(
-      "Mídia enviada com sucesso"
-    );
+    event.target.value = "";
+    alert("Mídia enviada com sucesso");
   } catch (error) {
     console.error(error);
-
-    alert(
-      "Erro ao enviar mídia"
-    );
+    alert("Erro ao enviar mídia");
   }
 }
 
@@ -1295,18 +1297,13 @@ async function handleFileUpload(
       <div className="p-4 border-t border-white/10 bg-[#050816]">
         <p className="text-[10px] text-zinc-400 mb-2">Responder WhatsApp</p>
 
-<div className="mb-3">
-  <input
-    type="file"
-    onChange={(e) =>
-      handleFileUpload(
-        e,
-        conversation.phone
-      )
-    }
-    className="w-full bg-[#0b1023] border border-white/10 rounded-xl p-2 text-xs"
-  />
-</div>
+        <div className="mb-3">
+          <input
+            type="file"
+            onChange={(event) => handleFileUpload(event, conversation.phone)}
+            className="w-full bg-[#0b1023] border border-white/10 rounded-xl p-2 text-xs file:mr-3 file:rounded-lg file:border-0 file:bg-blue-500/20 file:px-3 file:py-2 file:text-blue-300"
+          />
+        </div>
 
         <div className="flex gap-2">
           <input
