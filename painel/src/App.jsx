@@ -36,7 +36,6 @@ function formatMoney(value) {
 
 function formatTime(date) {
   if (!date) return "";
-
   return new Date(date).toLocaleTimeString("pt-PT", {
     hour: "2-digit",
     minute: "2-digit"
@@ -45,7 +44,6 @@ function formatTime(date) {
 
 function formatDateTime(date) {
   if (!date) return "Sem atividade";
-
   return new Date(date).toLocaleString("pt-PT", {
     day: "2-digit",
     month: "2-digit",
@@ -63,7 +61,6 @@ function playBeep() {
 
     oscillator.type = "sine";
     oscillator.frequency.value = 920;
-
     oscillator.connect(gain);
     gain.connect(audio.destination);
 
@@ -76,25 +73,26 @@ function playBeep() {
   }
 }
 
+function getLeadName(conversation) {
+  return conversation?.customer_name || conversation?.profile_name || "Cliente";
+}
+
 function getLastMessage(conversation) {
   if (!conversation?.history?.length) return "Sem mensagens";
-
   return conversation.history[conversation.history.length - 1]?.content || "Sem mensagens";
 }
 
 function getLastMessageTime(conversation) {
   if (!conversation?.history?.length) return "";
-
   return formatTime(conversation.history[conversation.history.length - 1]?.created_at);
 }
 
-function getLeadName(conversation) {
-  return conversation?.customer_name || conversation?.profile_name || "Cliente";
+function isAdmin(user) {
+  return user?.role === "admin";
 }
 
 function isAgentOnline(agent, onlineAgents) {
   if (!agent?.email) return false;
-
   return Object.values(onlineAgents || {}).includes(agent.email) || agent.online;
 }
 
@@ -144,6 +142,7 @@ function App() {
   const [email, setEmail] = useState(localStorage.getItem("saved_email") || "");
   const [password, setPassword] = useState(localStorage.getItem("saved_password") || "");
   const [remember, setRemember] = useState(true);
+  const [loginLoading, setLoginLoading] = useState(false);
 
   const [conversations, setConversations] = useState([]);
   const [appointments, setAppointments] = useState([]);
@@ -160,32 +159,51 @@ function App() {
   const interactedRef = useRef(false);
   const lastMessageCountRef = useRef(0);
 
+  const currentUser = session?.user || null;
+
+  const visibleConversations = useMemo(() => {
+    if (!currentUser) return [];
+    if (isAdmin(currentUser)) return conversations;
+
+    return conversations.filter((item) => {
+      return item.assigned_to_email === currentUser.email;
+    });
+  }, [conversations, currentUser]);
+
   const activeConversation = useMemo(() => {
     if (!selectedConversation?.phone) return null;
     return (
-      conversations.find((item) => item.phone === selectedConversation.phone) ||
+      visibleConversations.find((item) => item.phone === selectedConversation.phone) ||
       selectedConversation
     );
-  }, [conversations, selectedConversation]);
+  }, [visibleConversations, selectedConversation]);
 
-  const totalRevenue = appointments.reduce((total, item) => {
+  const visibleAppointments = useMemo(() => {
+    if (!currentUser || isAdmin(currentUser)) return appointments;
+
+    const allowedPhones = new Set(visibleConversations.map((item) => item.phone));
+    return appointments.filter((item) => allowedPhones.has(item.phone));
+  }, [appointments, currentUser, visibleConversations]);
+
+  const totalRevenue = visibleAppointments.reduce((total, item) => {
     return total + Number(item.price || 0);
   }, 0);
 
-  const averageTicket = appointments.length > 0 ? totalRevenue / appointments.length : 0;
+  const averageTicket =
+    visibleAppointments.length > 0 ? totalRevenue / visibleAppointments.length : 0;
 
-  const closedLeads = conversations.filter((item) => item.status === "Fechado").length;
+  const closedLeads = visibleConversations.filter((item) => item.status === "Fechado").length;
 
-  const activeLeads = conversations.filter(
+  const activeLeads = visibleConversations.filter(
     (item) => !["Fechado", "Perdido"].includes(item.status || "Novo Lead")
   ).length;
 
   const statusData = STATUS_OPTIONS.map((status) => ({
     name: status.replace("Aguardando Confirmação", "Confirmação"),
-    total: conversations.filter((item) => (item.status || "Novo Lead") === status).length
+    total: visibleConversations.filter((item) => (item.status || "Novo Lead") === status).length
   }));
 
-  const revenueData = appointments
+  const revenueData = visibleAppointments
     .map((item, index) => ({
       name: item.customer_name || `#${index + 1}`,
       value: Number(item.price || 0)
@@ -194,7 +212,6 @@ function App() {
 
   function addToast(message) {
     const id = Date.now();
-
     setToasts((prev) => [...prev, { id, message }]);
 
     setTimeout(() => {
@@ -273,9 +290,7 @@ function App() {
   async function updateStatus(phone, status) {
     await fetch(`${API_URL}/api/conversations/status`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ phone, status })
     });
 
@@ -285,9 +300,7 @@ function App() {
   async function updateDetails(phone, customer_name, notes) {
     await fetch(`${API_URL}/api/conversations/details`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ phone, customer_name, notes })
     });
 
@@ -297,9 +310,7 @@ function App() {
   async function updateTags(phone, tags) {
     await fetch(`${API_URL}/api/conversations/tags`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ phone, tags })
     });
 
@@ -307,15 +318,17 @@ function App() {
   }
 
   async function assignAgent(phone, agentEmail) {
-    const agent = agents.find((item) => item.email === agentEmail);
+    if (!isAdmin(currentUser)) {
+      addToast("Apenas admin pode trocar atendente");
+      return;
+    }
 
+    const agent = agents.find((item) => item.email === agentEmail);
     if (!agent) return;
 
     const response = await fetch(`${API_URL}/api/conversations/assign`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         phone,
         assigned_to: agent.name,
@@ -335,11 +348,14 @@ function App() {
   }
 
   async function autoAssignAgent(phone) {
+    if (!isAdmin(currentUser)) {
+      addToast("Apenas admin pode distribuir leads");
+      return;
+    }
+
     const response = await fetch(`${API_URL}/api/conversations/auto-assign`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ phone })
     });
 
@@ -357,9 +373,7 @@ function App() {
   async function generateSuggestion(phone) {
     await fetch(`${API_URL}/api/ai-suggestion`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ phone })
     });
 
@@ -370,9 +384,7 @@ function App() {
   async function followUp(phone) {
     await fetch(`${API_URL}/api/follow-up`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ phone })
     });
 
@@ -383,9 +395,7 @@ function App() {
   async function markAsRead(phone) {
     await fetch(`${API_URL}/api/conversations/read`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ phone })
     });
 
@@ -394,14 +404,11 @@ function App() {
 
   async function sendManualMessage(phone) {
     const message = replyMessage[phone];
-
     if (!message?.trim()) return;
 
     const response = await fetch(`${API_URL}/api/send-message`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ phone, message })
     });
 
@@ -412,11 +419,7 @@ function App() {
       return;
     }
 
-    setReplyMessage((prev) => ({
-      ...prev,
-      [phone]: ""
-    }));
-
+    setReplyMessage((prev) => ({ ...prev, [phone]: "" }));
     addToast("Mensagem enviada");
     await loadConversations({ silent: true });
   }
@@ -430,9 +433,7 @@ function App() {
 
     const response = await fetch(`${API_URL}/api/confirm-appointment`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         customer_name: conversation.customer_name || conversation.profile_name || "Cliente",
         phone: conversation.phone,
@@ -461,20 +462,30 @@ function App() {
     addToast("Lead movido");
   }
 
-  function login(e) {
+  async function login(e) {
     e.preventDefault();
+    setLoginLoading(true);
 
-    if (
-      email.trim().toLowerCase() === "bruno.coop32@icloud.com" &&
-      password.trim() === "jaftYw-nirke9-dibsab"
-    ) {
-      const adminSession = {
-        user: {
-          email: "bruno.coop32@icloud.com"
-        }
-      };
+    try {
+      const response = await fetch(`${API_URL}/api/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          password: password.trim()
+        })
+      });
 
-      localStorage.setItem("luna_admin", JSON.stringify(adminSession));
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(data.error || "Login inválido");
+        return;
+      }
+
+      const userSession = { user: data.user };
+
+      localStorage.setItem("luna_admin", JSON.stringify(userSession));
 
       if (remember) {
         localStorage.setItem("saved_email", email);
@@ -484,16 +495,19 @@ function App() {
         localStorage.removeItem("saved_password");
       }
 
-      setSession(adminSession);
-      return;
+      setSession(userSession);
+    } catch (error) {
+      alert("Erro ao fazer login. Verifique se o backend foi atualizado no Railway.");
+      console.error(error);
+    } finally {
+      setLoginLoading(false);
     }
-
-    alert("Login inválido");
   }
 
   function logout() {
     localStorage.removeItem("luna_admin");
     setSession(null);
+    setSelectedConversation(null);
   }
 
   useEffect(() => {
@@ -503,20 +517,14 @@ function App() {
     loadAppointments();
     loadAgents();
 
-    socket.emit("panel_online", {
-      user: session.user.email
-    });
+    socket.emit("panel_online", { user: session.user.email });
 
     socket.on("connect", () => {
       setSocketConnected(true);
-      socket.emit("panel_online", {
-        user: session.user.email
-      });
+      socket.emit("panel_online", { user: session.user.email });
     });
 
-    socket.on("disconnect", () => {
-      setSocketConnected(false);
-    });
+    socket.on("disconnect", () => setSocketConnected(false));
 
     socket.on("new_message", (data) => {
       if (interactedRef.current) playBeep();
@@ -524,46 +532,27 @@ function App() {
       loadConversations({ silent: true });
     });
 
-    socket.on("conversation_updated", () => {
-      loadConversations({ silent: true });
-    });
-
-    socket.on("conversation_assigned", () => {
-      loadConversations({ silent: true });
-    });
-
-    socket.on("agents_updated", () => {
-      loadAgents();
-    });
-
+    socket.on("conversation_updated", () => loadConversations({ silent: true }));
+    socket.on("conversation_assigned", () => loadConversations({ silent: true }));
+    socket.on("agents_updated", () => loadAgents());
     socket.on("appointment_confirmed", () => {
       loadAppointments();
       loadConversations({ silent: true });
     });
 
     socket.on("typing", (data) => {
-      setTypingUsers((prev) => ({
-        ...prev,
-        [data.phone]: data.typing
-      }));
+      setTypingUsers((prev) => ({ ...prev, [data.phone]: data.typing }));
     });
 
-    socket.on("online_users", (users) => {
-      setOnlineUsers(users || {});
-    });
+    socket.on("online_users", (users) => setOnlineUsers(users || {}));
 
     socket.on("online_agents", (users) => {
       setOnlineAgents(users || {});
       loadAgents();
     });
 
-    socket.on("conversation_summary", () => {
-      loadConversations({ silent: true });
-    });
-
-    socket.on("ai_suggestion", () => {
-      loadConversations({ silent: true });
-    });
+    socket.on("conversation_summary", () => loadConversations({ silent: true }));
+    socket.on("ai_suggestion", () => loadConversations({ silent: true }));
 
     const fallback = setInterval(() => {
       if (!socket.connected) {
@@ -601,7 +590,7 @@ function App() {
             Luna AI
           </h1>
 
-          <p className="text-zinc-400 text-sm mb-6">Painel Enterprise</p>
+          <p className="text-zinc-400 text-sm mb-6">Login da equipe</p>
 
           <input
             className="w-full bg-zinc-900 border border-zinc-800 p-3 rounded-xl mb-3 outline-none"
@@ -627,9 +616,18 @@ function App() {
             Lembrar acesso
           </label>
 
-          <button className="w-full bg-white text-black p-3 rounded-xl font-bold">
-            Entrar
+          <button
+            disabled={loginLoading}
+            className="w-full bg-white text-black p-3 rounded-xl font-bold disabled:opacity-50"
+          >
+            {loginLoading ? "Entrando..." : "Entrar"}
           </button>
+
+          <div className="mt-5 bg-[#050816] border border-white/10 rounded-xl p-3 text-xs text-zinc-400 space-y-1">
+            <p>Admin: bruno.coop32@icloud.com</p>
+            <p>Atendente: maria@luna.com</p>
+            <p>Senha inicial: 123456</p>
+          </div>
         </form>
       </div>
     );
@@ -652,9 +650,13 @@ function App() {
             </h1>
 
             <div className="flex flex-wrap items-center gap-2 mt-1">
-              <p className="text-zinc-400 text-sm">{session.user.email}</p>
+              <p className="text-zinc-400 text-sm">
+                {currentUser?.name} • {currentUser?.email}
+              </p>
               <span className="text-zinc-700">•</span>
-              <p className="text-xs text-purple-300">Empresa: Luna Studio</p>
+              <p className="text-xs text-purple-300">
+                Perfil: {isAdmin(currentUser) ? "Admin" : "Atendente"}
+              </p>
               <span
                 className={`w-2 h-2 rounded-full ${
                   socketConnected ? "bg-green-400" : "bg-red-400"
@@ -686,14 +688,14 @@ function App() {
           />
 
           <div className="bg-[#0b1023] border border-zinc-800 rounded-2xl px-4 py-3 text-sm flex justify-between items-center">
-            <span className="text-zinc-400">Leads ativos</span>
+            <span className="text-zinc-400">Leads visíveis</span>
             <strong>{activeLeads}</strong>
           </div>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
           <FinanceCard title="Faturamento" value={formatMoney(totalRevenue)} subtitle="Total confirmado" />
-          <FinanceCard title="Agendamentos" value={appointments.length} subtitle="Agenda total" />
+          <FinanceCard title="Agendamentos" value={visibleAppointments.length} subtitle="Agenda visível" />
           <FinanceCard title="Ticket Médio" value={formatMoney(averageTicket)} subtitle="Média por cliente" />
           <FinanceCard title="Fechados" value={closedLeads} subtitle="Leads ganhos" />
         </div>
@@ -742,7 +744,7 @@ function App() {
                 <Column
                   key={status}
                   status={status}
-                  conversations={conversations}
+                  conversations={visibleConversations}
                   search={search}
                   selectedConversation={activeConversation}
                   setSelectedConversation={setSelectedConversation}
@@ -757,6 +759,7 @@ function App() {
 
             <LeadPanel
               conversation={activeConversation}
+              currentUser={currentUser}
               typingUsers={typingUsers}
               onlineUsers={onlineUsers}
               agents={agents}
@@ -778,7 +781,7 @@ function App() {
           </div>
         </DragDropContext>
 
-        <Appointments appointments={appointments} />
+        <Appointments appointments={visibleAppointments} />
       </div>
     </div>
   );
@@ -790,7 +793,7 @@ function AgentBar({ agents, onlineAgents }) {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div>
           <p className="text-sm font-bold">Equipe de atendimento</p>
-          <p className="text-xs text-zinc-500">Multi-atendentes preparado para distribuição de leads</p>
+          <p className="text-xs text-zinc-500">Admin vê tudo. Atendentes veem apenas seus leads.</p>
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -830,7 +833,6 @@ function Column({
     .filter((item) => (item.status || "Novo Lead") === status)
     .filter((item) => {
       const searchText = search.trim().toLowerCase();
-
       if (!searchText) return true;
 
       const values = [
@@ -981,6 +983,7 @@ function Column({
 
 function LeadPanel({
   conversation,
+  currentUser,
   typingUsers,
   onlineUsers,
   agents,
@@ -1018,6 +1021,7 @@ function LeadPanel({
   }
 
   const isOnline = Boolean(onlineUsers[conversation.phone]);
+  const admin = isAdmin(currentUser);
 
   return (
     <div className="bg-[#0b1023] border border-zinc-800 rounded-3xl overflow-hidden 2xl:sticky 2xl:top-4 h-auto 2xl:h-[calc(100vh-32px)] flex flex-col">
@@ -1051,19 +1055,13 @@ function LeadPanel({
           </button>
         </div>
 
-        <div className="grid grid-cols-3 gap-2 mt-4">
+        <div className={`grid ${admin ? "grid-cols-3" : "grid-cols-2"} gap-2 mt-4`}>
           <button
             onClick={() => followUp(conversation.phone)}
             className="bg-yellow-500/10 border border-yellow-500/20 text-yellow-300 rounded-xl py-2 text-xs"
           >
             Follow-up
           </button>
-          <button
-  onClick={() => autoAssignAgent(conversation.phone)}
-  className="bg-blue-500/10 border border-blue-500/20 text-blue-300 rounded-xl py-2 text-xs"
->
-  Auto distribuir
-</button>
 
           <button
             onClick={() => generateSuggestion(conversation.phone)}
@@ -1071,6 +1069,15 @@ function LeadPanel({
           >
             Gerar IA
           </button>
+
+          {admin && (
+            <button
+              onClick={() => autoAssignAgent(conversation.phone)}
+              className="bg-blue-500/10 border border-blue-500/20 text-blue-300 rounded-xl py-2 text-xs"
+            >
+              Auto distribuir
+            </button>
+          )}
         </div>
       </div>
 
@@ -1107,30 +1114,31 @@ function LeadPanel({
         <div className="bg-[#050816] border border-white/10 rounded-2xl p-3 mb-3">
           <div className="flex items-center justify-between mb-2">
             <p className="text-[10px] text-zinc-400">Atendente responsável</p>
-            <button
-              onClick={() => autoAssignAgent(conversation.phone)}
-              className="text-[10px] text-purple-300 bg-purple-500/10 border border-purple-500/20 rounded-lg px-2 py-1"
-            >
-              Auto distribuir
-            </button>
+            {!admin && <span className="text-[10px] text-zinc-500">Somente admin altera</span>}
           </div>
 
-          <select
-            className="w-full bg-[#0b1023] border border-white/10 rounded-xl p-3 text-xs"
-            value={conversation.assigned_to_email || ""}
-            onChange={(e) => assignAgent(conversation.phone, e.target.value)}
-          >
-            <option value="">Selecionar atendente</option>
-            {agents.map((agent) => {
-              const online = isAgentOnline(agent, onlineAgents);
+          {admin ? (
+            <select
+              className="w-full bg-[#0b1023] border border-white/10 rounded-xl p-3 text-xs"
+              value={conversation.assigned_to_email || ""}
+              onChange={(e) => assignAgent(conversation.phone, e.target.value)}
+            >
+              <option value="">Selecionar atendente</option>
+              {agents.map((agent) => {
+                const online = isAgentOnline(agent, onlineAgents);
 
-              return (
-                <option key={agent.email || agent.name} value={agent.email}>
-                  {agent.name} {online ? "• online" : "• offline"}
-                </option>
-              );
-            })}
-          </select>
+                return (
+                  <option key={agent.email || agent.name} value={agent.email}>
+                    {agent.name} {online ? "• online" : "• offline"}
+                  </option>
+                );
+              })}
+            </select>
+          ) : (
+            <div className="bg-[#0b1023] border border-white/10 rounded-xl p-3 text-xs text-blue-300">
+              {conversation.assigned_to || currentUser?.name || "Atendente"}
+            </div>
+          )}
 
           <p className="text-[10px] text-zinc-500 mt-2">
             Atual: {conversation.assigned_to || "Admin"}
@@ -1180,11 +1188,7 @@ function LeadPanel({
             placeholder="Observações"
             defaultValue={conversation.notes || ""}
             onBlur={(e) =>
-              updateDetails(
-                conversation.phone,
-                conversation.customer_name || "",
-                e.target.value
-              )
+              updateDetails(conversation.phone, conversation.customer_name || "", e.target.value)
             }
           />
 
@@ -1248,9 +1252,7 @@ function LeadPanel({
               }))
             }
             onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                sendManualMessage(conversation.phone);
-              }
+              if (e.key === "Enter") sendManualMessage(conversation.phone);
             }}
           />
 

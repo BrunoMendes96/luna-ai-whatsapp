@@ -194,6 +194,118 @@ async function getLeastBusyAgent() {
   }, agents[0]);
 }
 
+async function logAgentActivity({
+  agent_email = "",
+  agent_name = "",
+  action = "",
+  phone = "",
+  metadata = {}
+}) {
+  try {
+    await supabase.from("crm_agent_activity").insert({
+      company_id: DEFAULT_COMPANY_ID,
+      agent_email,
+      agent_name,
+      action,
+      phone,
+      metadata
+    });
+  } catch (error) {
+    console.error("ERRO LOG ACTIVITY:", error.message);
+  }
+}
+
+async function getAgentsDashboard() {
+  const { data: agents, error: agentsError } = await supabase
+    .from("crm_agents")
+    .select("*")
+    .eq("company_id", DEFAULT_COMPANY_ID)
+    .eq("active", true)
+    .order("created_at", { ascending: true });
+
+  if (agentsError) throw agentsError;
+
+  const { data: conversations, error: conversationsError } = await supabase
+    .from("conversations")
+    .select("phone, status, assigned_to, assigned_to_email, unread_count")
+    .eq("company_id", DEFAULT_COMPANY_ID);
+
+  if (conversationsError) throw conversationsError;
+
+  const { data: appointments, error: appointmentsError } = await supabase
+    .from("appointments")
+    .select("phone, price, confirmed")
+    .eq("company_id", DEFAULT_COMPANY_ID);
+
+  if (appointmentsError) throw appointmentsError;
+
+  const groupedLeads = {};
+  const groupedAppointments = {};
+
+  (conversations || []).forEach((item) => {
+    if (!item.phone || groupedLeads[item.phone]) return;
+    groupedLeads[item.phone] = item;
+  });
+
+  (appointments || []).forEach((item) => {
+    if (!groupedAppointments[item.phone]) {
+      groupedAppointments[item.phone] = [];
+    }
+
+    groupedAppointments[item.phone].push(item);
+  });
+
+  return (agents || []).map((agent) => {
+    const leads = Object.values(groupedLeads).filter(
+      (item) => item.assigned_to_email === agent.email
+    );
+
+    const closed = leads.filter((item) => item.status === "Fechado").length;
+
+    const activeLeads = leads.filter(
+      (item) => !["Fechado", "Perdido"].includes(item.status || "Novo Lead")
+    ).length;
+
+    const unread = leads.reduce((total, item) => {
+      return total + Number(item.unread_count || 0);
+    }, 0);
+
+    const revenue = leads.reduce((total, lead) => {
+      const leadAppointments = groupedAppointments[lead.phone] || [];
+
+      return (
+        total +
+        leadAppointments.reduce((sum, appointment) => {
+          return sum + Number(appointment.price || 0);
+        }, 0)
+      );
+    }, 0);
+
+    const commissionRate = Number(agent.commission_rate || 0);
+    const monthlyGoal = Number(agent.monthly_goal || 0);
+    const commission = (revenue * commissionRate) / 100;
+    const goalProgress =
+      monthlyGoal > 0 ? Math.min(100, Math.round((revenue / monthlyGoal) * 100)) : 0;
+
+    return {
+      id: agent.id,
+      name: agent.name,
+      email: agent.email,
+      role: agent.role,
+      online: agent.online,
+      commission_rate: commissionRate,
+      monthly_goal: monthlyGoal,
+      leads_total: leads.length,
+      active_leads: activeLeads,
+      closed_leads: closed,
+      unread_messages: unread,
+      revenue,
+      commission,
+      goal_progress: goalProgress
+    };
+  });
+}
+
 async function saveMessage(phone, role, content, extra = {}) {
   const assignedAgent = extra.assignedAgent || (await getLeastBusyAgent());
 
@@ -409,6 +521,15 @@ app.post("/api/login", async (req, res) => {
       });
     }
 
+    await logAgentActivity({
+      agent_email: data.email,
+      agent_name: data.name,
+      action: "login",
+      metadata: {
+        role: data.role
+      }
+    });
+
     res.json({
       success: true,
       user: {
@@ -418,6 +539,49 @@ app.post("/api/login", async (req, res) => {
         role: data.role
       }
     });
+  } catch (error) {
+    res.status(500).json({
+      error: error.message
+    });
+  }
+});
+
+app.get("/api/dashboard/agents", async (req, res) => {
+  try {
+    const dashboard = await getAgentsDashboard();
+
+    res.json(dashboard);
+  } catch (error) {
+    res.status(500).json({
+      error: error.message
+    });
+  }
+});
+
+app.get("/api/agent/activity", async (req, res) => {
+  try {
+    const { agent_email } = req.query;
+
+    let query = supabase
+      .from("crm_agent_activity")
+      .select("*")
+      .eq("company_id", DEFAULT_COMPANY_ID)
+      .order("created_at", { ascending: false })
+      .limit(100);
+
+    if (agent_email) {
+      query = query.eq("agent_email", agent_email);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      return res.status(500).json({
+        error: error.message
+      });
+    }
+
+    res.json(data || []);
   } catch (error) {
     res.status(500).json({
       error: error.message
@@ -503,6 +667,17 @@ app.post("/api/conversations/assign", async (req, res) => {
       return res.status(500).json({ error: error.message });
     }
 
+    await logAgentActivity({
+      agent_email: assigned_to_email,
+      agent_name: assigned_to,
+      action: "lead_assigned",
+      phone,
+      metadata: {
+        assigned_to,
+        assigned_to_email
+      }
+    });
+
     emitRealtime("conversation_assigned", {
       phone,
       assigned_to,
@@ -540,6 +715,17 @@ app.post("/api/conversations/auto-assign", async (req, res) => {
     if (error) {
       return res.status(500).json({ error: error.message });
     }
+
+    await logAgentActivity({
+      agent_email: agent.email,
+      agent_name: agent.name,
+      action: "lead_auto_assigned",
+      phone,
+      metadata: {
+        assigned_to: agent.name,
+        assigned_to_email: agent.email
+      }
+    });
 
     emitRealtime("conversation_assigned", {
       phone,
@@ -632,6 +818,14 @@ app.post("/api/conversations/status", async (req, res) => {
     .eq("company_id", DEFAULT_COMPANY_ID)
     .eq("phone", phone);
 
+  await logAgentActivity({
+    action: "status_updated",
+    phone,
+    metadata: {
+      status
+    }
+  });
+
   emitRealtime("conversation_updated", {
     phone,
     status
@@ -653,6 +847,14 @@ app.post("/api/conversations/details", async (req, res) => {
     .eq("company_id", DEFAULT_COMPANY_ID)
     .eq("phone", phone);
 
+  await logAgentActivity({
+    action: "details_updated",
+    phone,
+    metadata: {
+      customer_name
+    }
+  });
+
   emitRealtime("conversation_updated", {
     phone
   });
@@ -671,6 +873,14 @@ app.post("/api/conversations/tags", async (req, res) => {
     })
     .eq("company_id", DEFAULT_COMPANY_ID)
     .eq("phone", phone);
+
+  await logAgentActivity({
+    action: "tags_updated",
+    phone,
+    metadata: {
+      tags
+    }
+  });
 
   emitRealtime("conversation_updated", {
     phone,
@@ -935,6 +1145,17 @@ Esperamos você 💙`;
     await sendWhatsAppMessage(phone, confirmationMessage);
     await saveMessage(phone, "assistant", confirmationMessage);
 
+    await logAgentActivity({
+      action: "appointment_confirmed",
+      phone,
+      metadata: {
+        customer_name,
+        service,
+        appointment_date,
+        price
+      }
+    });
+
     emitRealtime("appointment_confirmed", {
       phone,
       customer_name,
@@ -989,6 +1210,15 @@ app.post("/api/send-message", async (req, res) => {
 
     await sendWhatsAppMessage(phone, message);
     await saveMessage(phone, "assistant", message);
+
+    await logAgentActivity({
+      action: "manual_message_sent",
+      phone,
+      metadata: {
+        message
+      }
+    });
+
     await generateSummary(phone);
     await generateSuggestion(phone);
 
@@ -1013,6 +1243,14 @@ app.post("/api/follow-up", async (req, res) => {
 
     await sendWhatsAppMessage(phone, message);
     await saveMessage(phone, "assistant", message);
+
+    await logAgentActivity({
+      action: "follow_up_sent",
+      phone,
+      metadata: {
+        message
+      }
+    });
 
     res.json({
       success: true
