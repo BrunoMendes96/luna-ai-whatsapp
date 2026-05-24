@@ -1,6 +1,7 @@
 import express from "express";
 import fs from "fs";
 import FormData from "form-data";
+import multer from "multer";
 import axios from "axios";
 import dotenv from "dotenv";
 import OpenAI from "openai";
@@ -1236,8 +1237,7 @@ app.post("/api/send-message", async (req, res) => {
   }
 });
 
-import fs from "fs";
-import FormData from "form-data";
+
 
 const upload = multer({
   dest: "uploads/"
