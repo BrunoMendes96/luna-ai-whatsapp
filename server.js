@@ -39,8 +39,17 @@ const DEFAULT_COMPANY_ID = "default_company";
 io.on("connection", (socket) => {
   console.log("Painel conectado:", socket.id);
 
-  socket.on("panel_online", (data) => {
-    activeAgents[socket.id] = data.user;
+  socket.on("panel_online", async (data) => {
+    const userEmail = data?.user || "";
+    activeAgents[socket.id] = userEmail;
+
+    if (userEmail) {
+      await supabase
+        .from("crm_agents")
+        .update({ online: true })
+        .eq("company_id", DEFAULT_COMPANY_ID)
+        .eq("email", userEmail);
+    }
 
     io.emit("online_agents", activeAgents);
   });
@@ -57,7 +66,17 @@ io.on("connection", (socket) => {
     success: true
   });
 
-  socket.on("disconnect", () => {
+  socket.on("disconnect", async () => {
+    const userEmail = activeAgents[socket.id];
+
+    if (userEmail) {
+      await supabase
+        .from("crm_agents")
+        .update({ online: false })
+        .eq("company_id", DEFAULT_COMPANY_ID)
+        .eq("email", userEmail);
+    }
+
     delete activeAgents[socket.id];
 
     io.emit("online_agents", activeAgents);
@@ -114,7 +133,70 @@ function detectAppointment(text) {
   };
 }
 
+async function getDefaultAgent() {
+  const { data } = await supabase
+    .from("crm_agents")
+    .select("*")
+    .eq("company_id", DEFAULT_COMPANY_ID)
+    .eq("active", true)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .single();
+
+  return data || {
+    name: "Admin",
+    email: "bruno.coop32@icloud.com"
+  };
+}
+
+async function getLeastBusyAgent() {
+  const { data: agents } = await supabase
+    .from("crm_agents")
+    .select("*")
+    .eq("company_id", DEFAULT_COMPANY_ID)
+    .eq("active", true)
+    .order("created_at", { ascending: true });
+
+  if (!agents || agents.length === 0) {
+    return getDefaultAgent();
+  }
+
+  const { data: conversations } = await supabase
+    .from("conversations")
+    .select("phone, assigned_to_email")
+    .eq("company_id", DEFAULT_COMPANY_ID);
+
+  const loadByEmail = {};
+
+  agents.forEach((agent) => {
+    loadByEmail[agent.email] = 0;
+  });
+
+  const uniquePhones = new Set();
+
+  (conversations || []).forEach((item) => {
+    const key = `${item.phone}-${item.assigned_to_email}`;
+
+    if (
+      !uniquePhones.has(key) &&
+      loadByEmail[item.assigned_to_email] !== undefined
+    ) {
+      uniquePhones.add(key);
+      loadByEmail[item.assigned_to_email] += 1;
+    }
+  });
+
+  return agents.reduce((leastBusy, agent) => {
+    const currentLoad = loadByEmail[agent.email] || 0;
+    const leastLoad = loadByEmail[leastBusy.email] || 0;
+
+    return currentLoad < leastLoad ? agent : leastBusy;
+  }, agents[0]);
+}
+
 async function saveMessage(phone, role, content, extra = {}) {
+  const assignedAgent = extra.assignedAgent || (await getLeastBusyAgent());
+
   const { data, error } = await supabase
     .from("conversations")
     .insert({
@@ -130,6 +212,13 @@ async function saveMessage(phone, role, content, extra = {}) {
       profile_picture: extra.profile_picture || "",
       tags: extra.tags || "",
       ai_suggestion: extra.ai_suggestion || "",
+      assigned_to: extra.assigned_to || assignedAgent?.name || "Admin",
+      assigned_to_email:
+        extra.assigned_to_email ||
+        assignedAgent?.email ||
+        "bruno.coop32@icloud.com",
+      priority: extra.priority || "Quente",
+      last_activity: new Date().toISOString(),
       unread_count: role === "user" ? 1 : 0
     })
     .select()
@@ -183,9 +272,10 @@ ${JSON.stringify(history)}
   await supabase
     .from("conversations")
     .update({
-      company_id: DEFAULT_COMPANY_ID,
-      summary
+      summary,
+      last_activity: new Date().toISOString()
     })
+    .eq("company_id", DEFAULT_COMPANY_ID)
     .eq("phone", phone);
 
   emitRealtime("conversation_summary", {
@@ -219,9 +309,10 @@ ${JSON.stringify(history)}
   await supabase
     .from("conversations")
     .update({
-      company_id: DEFAULT_COMPANY_ID,
-      ai_suggestion: suggestion
+      ai_suggestion: suggestion,
+      last_activity: new Date().toISOString()
     })
+    .eq("company_id", DEFAULT_COMPANY_ID)
     .eq("phone", phone);
 
   emitRealtime("ai_suggestion", {
@@ -299,10 +390,144 @@ app.get("/api/media/:mediaId", async (req, res) => {
   }
 });
 
+app.get("/api/agents", async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("crm_agents")
+      .select("*")
+      .eq("company_id", DEFAULT_COMPANY_ID)
+      .eq("active", true)
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      return res.status(500).json({ error: error.message });
+    }
+
+    res.json(data || []);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/api/agents", async (req, res) => {
+  try {
+    const { name, email, role = "agent" } = req.body;
+
+    if (!name || !email) {
+      return res.status(400).json({
+        error: "Nome e email são obrigatórios"
+      });
+    }
+
+    const { data, error } = await supabase
+      .from("crm_agents")
+      .insert({
+        company_id: DEFAULT_COMPANY_ID,
+        name,
+        email,
+        role,
+        active: true,
+        online: false
+      })
+      .select()
+      .single();
+
+    if (error) {
+      return res.status(500).json({ error: error.message });
+    }
+
+    emitRealtime("agents_updated", data);
+
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/api/conversations/assign", async (req, res) => {
+  try {
+    const { phone, assigned_to, assigned_to_email } = req.body;
+
+    if (!phone || !assigned_to || !assigned_to_email) {
+      return res.status(400).json({
+        error: "phone, assigned_to e assigned_to_email são obrigatórios"
+      });
+    }
+
+    const { error } = await supabase
+      .from("conversations")
+      .update({
+        assigned_to,
+        assigned_to_email,
+        last_activity: new Date().toISOString()
+      })
+      .eq("company_id", DEFAULT_COMPANY_ID)
+      .eq("phone", phone);
+
+    if (error) {
+      return res.status(500).json({ error: error.message });
+    }
+
+    emitRealtime("conversation_assigned", {
+      phone,
+      assigned_to,
+      assigned_to_email
+    });
+
+    emitRealtime("conversation_updated", { phone });
+
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/api/conversations/auto-assign", async (req, res) => {
+  try {
+    const { phone } = req.body;
+
+    if (!phone) {
+      return res.status(400).json({ error: "phone é obrigatório" });
+    }
+
+    const agent = await getLeastBusyAgent();
+
+    const { error } = await supabase
+      .from("conversations")
+      .update({
+        assigned_to: agent.name,
+        assigned_to_email: agent.email,
+        last_activity: new Date().toISOString()
+      })
+      .eq("company_id", DEFAULT_COMPANY_ID)
+      .eq("phone", phone);
+
+    if (error) {
+      return res.status(500).json({ error: error.message });
+    }
+
+    emitRealtime("conversation_assigned", {
+      phone,
+      assigned_to: agent.name,
+      assigned_to_email: agent.email
+    });
+
+    emitRealtime("conversation_updated", { phone });
+
+    res.json({
+      success: true,
+      agent
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get("/api/conversations", async (req, res) => {
   const { data, error } = await supabase
     .from("conversations")
     .select("*")
+    .eq("company_id", DEFAULT_COMPANY_ID)
     .order("created_at", { ascending: true });
 
   if (error) {
@@ -325,7 +550,11 @@ app.get("/api/conversations", async (req, res) => {
         summary: item.summary || "",
         tags: item.tags || "",
         ai_suggestion: item.ai_suggestion || "",
-        unread_count: item.unread_count || 0,
+        assigned_to: item.assigned_to || "Admin",
+        assigned_to_email: item.assigned_to_email || "bruno.coop32@icloud.com",
+        priority: item.priority || "Quente",
+        last_activity: item.last_activity || item.created_at,
+        unread_count: 0,
         history: []
       };
     }
@@ -345,6 +574,12 @@ app.get("/api/conversations", async (req, res) => {
     if (item.summary) grouped[item.phone].summary = item.summary;
     if (item.ai_suggestion) grouped[item.phone].ai_suggestion = item.ai_suggestion;
     if (item.tags) grouped[item.phone].tags = item.tags;
+    if (item.assigned_to) grouped[item.phone].assigned_to = item.assigned_to;
+    if (item.assigned_to_email) {
+      grouped[item.phone].assigned_to_email = item.assigned_to_email;
+    }
+    if (item.priority) grouped[item.phone].priority = item.priority;
+    if (item.last_activity) grouped[item.phone].last_activity = item.last_activity;
   });
 
   res.json(Object.values(grouped));
@@ -355,7 +590,10 @@ app.post("/api/conversations/status", async (req, res) => {
 
   await supabase
     .from("conversations")
-    .update({ status })
+    .update({
+      status,
+      last_activity: new Date().toISOString()
+    })
     .eq("company_id", DEFAULT_COMPANY_ID)
     .eq("phone", phone);
 
@@ -373,10 +611,11 @@ app.post("/api/conversations/details", async (req, res) => {
   await supabase
     .from("conversations")
     .update({
-      company_id: DEFAULT_COMPANY_ID,
       customer_name,
-      notes
+      notes,
+      last_activity: new Date().toISOString()
     })
+    .eq("company_id", DEFAULT_COMPANY_ID)
     .eq("phone", phone);
 
   emitRealtime("conversation_updated", {
@@ -392,9 +631,10 @@ app.post("/api/conversations/tags", async (req, res) => {
   await supabase
     .from("conversations")
     .update({
-      company_id: DEFAULT_COMPANY_ID,
-      tags
+      tags,
+      last_activity: new Date().toISOString()
     })
+    .eq("company_id", DEFAULT_COMPANY_ID)
     .eq("phone", phone);
 
   emitRealtime("conversation_updated", {
@@ -411,9 +651,10 @@ app.post("/api/conversations/read", async (req, res) => {
   await supabase
     .from("conversations")
     .update({
-      company_id: DEFAULT_COMPANY_ID,
-      unread_count: 0
+      unread_count: 0,
+      last_activity: new Date().toISOString()
     })
+    .eq("company_id", DEFAULT_COMPANY_ID)
     .eq("phone", phone);
 
   emitRealtime("conversation_updated", {
@@ -453,9 +694,10 @@ app.post("/webhook", async (req, res) => {
 
     const messageId = message.id;
     const from = message.from;
+
     onlineUsers[from] = true;
 
-emitRealtime("online_users", onlineUsers);
+    emitRealtime("online_users", onlineUsers);
 
     if (processedMessages.has(messageId)) {
       return res.sendStatus(200);
@@ -503,12 +745,15 @@ emitRealtime("online_users", onlineUsers);
       typing: true
     });
 
+    const assignedAgent = await getLeastBusyAgent();
+
     await saveMessage(from, "user", userText, {
       type: messageType,
       media_url: mediaUrl,
       media_mime_type: mediaMimeType,
       media_filename: mediaFilename,
-      profile_name: profileName
+      profile_name: profileName,
+      assignedAgent
     });
 
     const history = await getHistory(from);
@@ -543,9 +788,10 @@ ${userText}
       await supabase
         .from("conversations")
         .update({
-          company_id: DEFAULT_COMPANY_ID,
-          status: "Aguardando Confirmação"
+          status: "Aguardando Confirmação",
+          last_activity: new Date().toISOString()
         })
+        .eq("company_id", DEFAULT_COMPANY_ID)
         .eq("phone", from);
 
       reply = `Perfeito 😊
@@ -558,7 +804,9 @@ Horário: ${appointment.appointment_date}
 Vou verificar disponibilidade 💙`;
     }
 
-    await saveMessage(from, "assistant", reply);
+    await saveMessage(from, "assistant", reply, {
+      assignedAgent
+    });
 
     await sendWhatsAppMessage(from, reply);
 
@@ -615,15 +863,16 @@ Pode me enviar outro dia ou horário que eu verifico para você?`;
 
     const { error } = await supabase
       .from("appointments")
-.insert({
-  company_id: DEFAULT_COMPANY_ID,
-  customer_name,
-  phone,
-  service,
-  appointment_date,
-  price: Number(price || 0),
-  confirmed: true
-});
+      .insert({
+        company_id: DEFAULT_COMPANY_ID,
+        customer_name,
+        phone,
+        service,
+        appointment_date,
+        price: Number(price || 0),
+        confirmed: true
+      });
+
     if (error) {
       return res.status(500).json({
         error: error.message
@@ -633,11 +882,12 @@ Pode me enviar outro dia ou horário que eu verifico para você?`;
     await supabase
       .from("conversations")
       .update({
-        company_id: DEFAULT_COMPANY_ID,
         status: "Fechado",
         customer_name,
-        unread_count: 0
+        unread_count: 0,
+        last_activity: new Date().toISOString()
       })
+      .eq("company_id", DEFAULT_COMPANY_ID)
       .eq("phone", phone);
 
     const confirmationMessage = `Agendamento confirmado 😊
@@ -675,6 +925,7 @@ app.get("/api/appointments", async (req, res) => {
     const { data, error } = await supabase
       .from("appointments")
       .select("*")
+      .eq("company_id", DEFAULT_COMPANY_ID)
       .order("created_at", { ascending: false });
 
     if (error) {
