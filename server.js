@@ -1,4 +1,6 @@
 import express from "express";
+import fs from "fs";
+import FormData from "form-data";
 import axios from "axios";
 import dotenv from "dotenv";
 import OpenAI from "openai";
@@ -1233,6 +1235,140 @@ app.post("/api/send-message", async (req, res) => {
     });
   }
 });
+
+import fs from "fs";
+import FormData from "form-data";
+
+const upload = multer({
+  dest: "uploads/"
+});
+
+app.post(
+  "/api/send-media",
+  upload.single("file"),
+  async (req, res) => {
+    try {
+      const { phone } = req.body;
+      const file = req.file;
+
+      if (!phone || !file) {
+        return res.status(400).json({
+          error: "Telefone e arquivo obrigatórios"
+        });
+      }
+
+      const formData = new FormData();
+
+      formData.append(
+        "messaging_product",
+        "whatsapp"
+      );
+
+      formData.append(
+        "file",
+        fs.createReadStream(file.path),
+        {
+          filename: file.originalname,
+          contentType: file.mimetype
+        }
+      );
+
+      const uploadResponse =
+        await axios.post(
+          `https://graph.facebook.com/v20.0/${process.env.PHONE_NUMBER_ID}/media`,
+          formData,
+          {
+            headers: {
+              Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`,
+              ...formData.getHeaders()
+            }
+          }
+        );
+
+      const mediaId =
+        uploadResponse.data.id;
+
+      let type = "document";
+
+      if (
+        file.mimetype.startsWith(
+          "image/"
+        )
+      ) {
+        type = "image";
+      }
+
+      if (
+        file.mimetype.startsWith(
+          "audio/"
+        )
+      ) {
+        type = "audio";
+      }
+
+      if (
+        file.mimetype.startsWith(
+          "video/"
+        )
+      ) {
+        type = "video";
+      }
+
+      await axios.post(
+        `https://graph.facebook.com/v20.0/${process.env.PHONE_NUMBER_ID}/messages`,
+        {
+          messaging_product:
+            "whatsapp",
+          to: phone,
+          type,
+          [type]: {
+            id: mediaId
+          }
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`,
+            "Content-Type":
+              "application/json"
+          }
+        }
+      );
+
+      await saveMessage(
+        phone,
+        "assistant",
+        `Arquivo enviado: ${file.originalname}`,
+        {
+          type,
+          media_url: mediaId,
+          media_mime_type:
+            file.mimetype,
+          media_filename:
+            file.originalname
+        }
+      );
+
+      fs.unlinkSync(file.path);
+
+      res.json({
+        success: true
+      });
+    } catch (error) {
+      console.error(
+        "SEND MEDIA ERROR:",
+        error.response?.data ||
+          error.message
+      );
+
+      res.status(500).json({
+        error:
+          error.response?.data
+            ?.error?.message ||
+          "Erro ao enviar mídia"
+      });
+    }
+  }
+);
 
 app.post("/api/follow-up", async (req, res) => {
   try {
