@@ -390,6 +390,41 @@ app.get("/api/media/:mediaId", async (req, res) => {
   }
 });
 
+app.post("/api/login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    const { data, error } = await supabase
+      .from("crm_agents")
+      .select("*")
+      .eq("company_id", DEFAULT_COMPANY_ID)
+      .eq("email", email)
+      .eq("password", password)
+      .eq("active", true)
+      .single();
+
+    if (error || !data) {
+      return res.status(401).json({
+        error: "Email ou senha inválidos"
+      });
+    }
+
+    res.json({
+      success: true,
+      user: {
+        id: data.id,
+        name: data.name,
+        email: data.email,
+        role: data.role
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: error.message
+    });
+  }
+});
+
 app.get("/api/agents", async (req, res) => {
   try {
     const { data, error } = await supabase
