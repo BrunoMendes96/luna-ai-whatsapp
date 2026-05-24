@@ -32,16 +32,36 @@ const supabase = createClient(
 );
 
 const processedMessages = new Set();
+const onlineUsers = {};
+const activeAgents = {};
 const DEFAULT_COMPANY_ID = "default_company";
 
 io.on("connection", (socket) => {
   console.log("Painel conectado:", socket.id);
+
+  socket.on("panel_online", (data) => {
+    activeAgents[socket.id] = data.user;
+
+    io.emit("online_agents", activeAgents);
+  });
+
+  socket.on("lead_opened", (data) => {
+    io.emit("lead_selected", data);
+  });
+
+  socket.on("user_typing", (data) => {
+    io.emit("typing", data);
+  });
 
   socket.emit("connected", {
     success: true
   });
 
   socket.on("disconnect", () => {
+    delete activeAgents[socket.id];
+
+    io.emit("online_agents", activeAgents);
+
     console.log("Painel desconectado:", socket.id);
   });
 });
@@ -433,6 +453,9 @@ app.post("/webhook", async (req, res) => {
 
     const messageId = message.id;
     const from = message.from;
+    onlineUsers[from] = true;
+
+emitRealtime("online_users", onlineUsers);
 
     if (processedMessages.has(messageId)) {
       return res.sendStatus(200);

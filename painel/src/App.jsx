@@ -139,6 +139,9 @@ function App() {
   const [search, setSearch] = useState("");
   const [typingUsers, setTypingUsers] = useState({});
   const [toasts, setToasts] = useState([]);
+  const [selectedConversation, setSelectedConversation] = useState(null);
+  const [onlineUsers, setOnlineUsers] = useState({});
+  const [agents] = useState(["Admin", "Atendente 1", "Atendente 2"]);
 
   const interactedRef = useRef(false);
 
@@ -357,6 +360,16 @@ function App() {
     loadConversations();
     loadAppointments();
 
+    socket.emit("panel_online", {
+      user: session.user.email
+    });
+
+    socket.on("connect", () => {
+      socket.emit("panel_online", {
+        user: session.user.email
+      });
+    });
+
     socket.on("new_message", () => {
       loadConversations();
 
@@ -383,6 +396,18 @@ function App() {
       }));
     });
 
+    socket.on("online_users", (users) => {
+      setOnlineUsers(users || {});
+    });
+
+    socket.on("online_agents", () => {
+      // preparado para multi atendentes em tempo real
+    });
+
+    socket.on("lead_selected", () => {
+      // evento preparado para supervisão de atendimento
+    });
+
     socket.on("conversation_summary", () => {
       loadConversations();
     });
@@ -396,6 +421,10 @@ function App() {
       socket.off("conversation_updated");
       socket.off("appointment_confirmed");
       socket.off("typing");
+      socket.off("online_users");
+      socket.off("online_agents");
+      socket.off("lead_selected");
+      socket.off("connect");
       socket.off("conversation_summary");
       socket.off("ai_suggestion");
     };
@@ -433,6 +462,10 @@ function App() {
       value: Number(item.price || 0)
     })
   );
+
+  const activeConversation = selectedConversation
+    ? conversations.find((item) => item.phone === selectedConversation.phone) || selectedConversation
+    : null;
 
   if (!session) {
     return (
@@ -685,34 +718,47 @@ function App() {
           </ChartBox>
         </div>
 
-        <DragDropContext
-          onDragEnd={handleDragEnd}
-        >
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
-            {STATUS_OPTIONS.map((status) => (
-              <Column
-                key={status}
-                status={status}
-                conversations={conversations}
-                search={search}
-                typingUsers={typingUsers}
-                updateStatus={updateStatus}
-                updateDetails={updateDetails}
-                updateTags={updateTags}
-                sendManualMessage={
-                  sendManualMessage
-                }
-                replyMessage={replyMessage}
-                setReplyMessage={
-                  setReplyMessage
-                }
-                followUp={followUp}
-                generateSuggestion={
-                  generateSuggestion
-                }
-                markAsRead={markAsRead}
-              />
-            ))}
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <div className="grid grid-cols-1 2xl:grid-cols-[1fr_430px] gap-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
+              {STATUS_OPTIONS.map((status) => (
+                <Column
+                  key={status}
+                  status={status}
+                  conversations={conversations}
+                  search={search}
+                  typingUsers={typingUsers}
+                  updateStatus={updateStatus}
+                  updateDetails={updateDetails}
+                  updateTags={updateTags}
+                  sendManualMessage={sendManualMessage}
+                  replyMessage={replyMessage}
+                  setReplyMessage={setReplyMessage}
+                  followUp={followUp}
+                  generateSuggestion={generateSuggestion}
+                  markAsRead={markAsRead}
+                  selectedConversation={activeConversation}
+                  setSelectedConversation={setSelectedConversation}
+                />
+              ))}
+            </div>
+
+            <LeadPanel
+              conversation={activeConversation}
+              typingUsers={typingUsers}
+              onlineUsers={onlineUsers}
+              agents={agents}
+              updateStatus={updateStatus}
+              updateDetails={updateDetails}
+              updateTags={updateTags}
+              sendManualMessage={sendManualMessage}
+              replyMessage={replyMessage}
+              setReplyMessage={setReplyMessage}
+              followUp={followUp}
+              generateSuggestion={generateSuggestion}
+              markAsRead={markAsRead}
+              closePanel={() => setSelectedConversation(null)}
+            />
           </div>
         </DragDropContext>
 
@@ -737,7 +783,9 @@ function Column({
   setReplyMessage,
   followUp,
   generateSuggestion,
-  markAsRead
+  markAsRead,
+  selectedConversation,
+  setSelectedConversation
 }) {
   const filtered = conversations
     .filter((item) => (item.status || "Novo Lead") === status)
@@ -793,7 +841,17 @@ function Column({
                   <div
                     ref={provided.innerRef}
                     {...provided.draggableProps}
-                    className={`bg-[#111827] border border-white/10 rounded-2xl p-3 transition ${
+                    onClick={() => {
+                      setSelectedConversation(conversation);
+                      socket.emit("lead_opened", {
+                        phone: conversation.phone
+                      });
+                    }}
+                    className={`bg-[#111827] border rounded-2xl p-3 transition cursor-pointer ${
+                      selectedConversation?.phone === conversation.phone
+                        ? "border-purple-500 ring-2 ring-purple-500/30 shadow-lg shadow-purple-500/10"
+                        : "border-white/10"
+                    } ${
                       snapshot.isDragging ? "ring-2 ring-purple-500 scale-[1.02]" : ""
                     }`}
                   >
@@ -1027,6 +1085,279 @@ function Column({
         </div>
       )}
     </Droppable>
+  );
+}
+
+
+function LeadPanel({
+  conversation,
+  typingUsers,
+  onlineUsers,
+  agents,
+  updateStatus,
+  updateDetails,
+  updateTags,
+  sendManualMessage,
+  replyMessage,
+  setReplyMessage,
+  followUp,
+  generateSuggestion,
+  markAsRead,
+  closePanel
+}) {
+  if (!conversation) {
+    return (
+      <div className="bg-[#0b1023] border border-zinc-800 rounded-3xl p-6 min-h-[520px] 2xl:sticky 2xl:top-4 hidden 2xl:flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 rounded-3xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center mx-auto mb-4">
+            <span className="text-3xl">✨</span>
+          </div>
+
+          <h2 className="font-black text-xl mb-2">Selecione um lead</h2>
+
+          <p className="text-sm text-zinc-400 max-w-xs">
+            Clique em qualquer card do Kanban para abrir o atendimento completo,
+            histórico, IA, tags e observações aqui.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const isOnline = Boolean(onlineUsers[conversation.phone]);
+
+  return (
+    <div className="bg-[#0b1023] border border-zinc-800 rounded-3xl overflow-hidden 2xl:sticky 2xl:top-4 h-auto 2xl:h-[calc(100vh-32px)] flex flex-col">
+      <div className="p-4 border-b border-white/10 bg-gradient-to-r from-purple-500/10 to-blue-500/10">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <Avatar conversation={conversation} />
+
+            <div className="min-w-0">
+              <h2 className="font-black text-lg truncate">
+                {conversation.customer_name ||
+                  conversation.profile_name ||
+                  "Cliente"}
+              </h2>
+
+              <p className="text-xs text-zinc-400 truncate">
+                {conversation.phone}
+              </p>
+
+              <div className="flex items-center gap-2 mt-1">
+                <span
+                  className={`w-2 h-2 rounded-full ${
+                    isOnline ? "bg-green-400" : "bg-zinc-500"
+                  }`}
+                />
+                <span className="text-[10px] text-zinc-400">
+                  {isOnline ? "Online agora" : "Offline"}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <button
+            onClick={closePanel}
+            className="bg-white/10 hover:bg-white/20 text-zinc-300 rounded-xl px-3 py-2 text-xs"
+          >
+            Fechar
+          </button>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 mt-4">
+          <button
+            onClick={() => followUp(conversation.phone)}
+            className="bg-yellow-500/10 border border-yellow-500/20 text-yellow-300 rounded-xl py-2 text-xs"
+          >
+            Follow-up
+          </button>
+
+          <button
+            onClick={() => generateSuggestion(conversation.phone)}
+            className="bg-purple-500/10 border border-purple-500/20 text-purple-300 rounded-xl py-2 text-xs"
+          >
+            Gerar IA
+          </button>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-4">
+        <div className="grid grid-cols-2 gap-2 mb-3">
+          <div className="bg-[#050816] border border-white/10 rounded-xl p-3">
+            <p className="text-[10px] text-zinc-400">Prioridade</p>
+            <p className="text-xs text-red-300 font-bold mt-1">🔴 Quente</p>
+          </div>
+
+          <div className="bg-[#050816] border border-white/10 rounded-xl p-3">
+            <p className="text-[10px] text-zinc-400">Não lidas</p>
+            <p className="text-xs text-purple-300 font-bold mt-1">
+              {conversation.unread_count || 0}
+            </p>
+          </div>
+        </div>
+
+        <select
+          className="w-full bg-[#050816] border border-white/10 rounded-xl p-3 mb-3 text-xs"
+          value={conversation.status || "Novo Lead"}
+          onChange={(e) => updateStatus(conversation.phone, e.target.value)}
+        >
+          {STATUS_OPTIONS.map((item) => (
+            <option key={item} value={item}>
+              {item}
+            </option>
+          ))}
+        </select>
+
+        {conversation.summary && (
+          <div className="bg-purple-500/10 border border-purple-500/20 rounded-2xl p-3 mb-3">
+            <p className="text-[10px] text-purple-300 mb-1">Resumo IA</p>
+            <p className="text-xs text-zinc-300 leading-relaxed">
+              {conversation.summary}
+            </p>
+          </div>
+        )}
+
+        {conversation.ai_suggestion && (
+          <div className="bg-blue-500/10 border border-blue-500/20 rounded-2xl p-3 mb-3">
+            <p className="text-[10px] text-blue-300 mb-1">Sugestão IA</p>
+            <p className="text-xs text-zinc-300 leading-relaxed">
+              {conversation.ai_suggestion}
+            </p>
+
+            <button
+              onClick={() =>
+                setReplyMessage((prev) => ({
+                  ...prev,
+                  [conversation.phone]: conversation.ai_suggestion
+                }))
+              }
+              className="mt-3 bg-blue-500/20 text-blue-300 rounded-xl px-3 py-2 text-xs"
+            >
+              Usar sugestão
+            </button>
+          </div>
+        )}
+
+        <div className="bg-[#050816] border border-white/10 rounded-2xl p-3 mb-3">
+          <p className="text-[10px] text-zinc-400 mb-2">Dados do lead</p>
+
+          <input
+            className="w-full bg-[#0b1023] border border-white/10 rounded-xl p-2 mb-2 text-xs"
+            placeholder="Nome"
+            defaultValue={conversation.customer_name || ""}
+            onBlur={(e) =>
+              updateDetails(
+                conversation.phone,
+                e.target.value,
+                conversation.notes || ""
+              )
+            }
+          />
+
+          <textarea
+            className="w-full bg-[#0b1023] border border-white/10 rounded-xl p-2 mb-2 text-xs h-20"
+            placeholder="Observações"
+            defaultValue={conversation.notes || ""}
+            onBlur={(e) =>
+              updateDetails(
+                conversation.phone,
+                conversation.customer_name || "",
+                e.target.value
+              )
+            }
+          />
+
+          <input
+            className="w-full bg-[#0b1023] border border-white/10 rounded-xl p-2 text-xs"
+            placeholder="Tags"
+            defaultValue={conversation.tags || ""}
+            onBlur={(e) => updateTags(conversation.phone, e.target.value)}
+          />
+        </div>
+
+        <div className="bg-[#050816] border border-white/10 rounded-2xl p-3 mb-3">
+          <p className="text-[10px] text-zinc-400 mb-2">
+            Atendente responsável
+          </p>
+
+          <select className="w-full bg-[#0b1023] border border-white/10 rounded-xl p-2 text-xs">
+            {agents.map((agent) => (
+              <option key={agent}>{agent}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="bg-[#050816] border border-white/10 rounded-2xl p-3 mb-3">
+          <p className="text-[10px] text-zinc-400 mb-2">Timeline</p>
+
+          <div className="space-y-1">
+            <p className="text-[10px] text-zinc-300">✅ Lead criado</p>
+            <p className="text-[10px] text-zinc-300">💬 Cliente respondeu</p>
+            <p className="text-[10px] text-zinc-300">🤖 IA respondeu</p>
+
+            {conversation.status === "Fechado" && (
+              <p className="text-[10px] text-green-400">💰 Lead fechado</p>
+            )}
+          </div>
+        </div>
+
+        <div
+          className="bg-[#050816] border border-white/10 rounded-2xl p-3 mb-3"
+          onClick={() => markAsRead(conversation.phone)}
+        >
+          <div className="flex justify-between items-center mb-3">
+            <p className="text-[10px] text-zinc-400">Histórico completo</p>
+
+            {typingUsers[conversation.phone] && (
+              <p className="text-[10px] text-green-400 italic animate-pulse">
+                digitando...
+              </p>
+            )}
+          </div>
+
+          <div className="h-[320px] overflow-y-auto space-y-2 pr-1">
+            {conversation.history?.length ? (
+              conversation.history.map((msg, index) => (
+                <MessageBubble key={index} msg={msg} />
+              ))
+            ) : (
+              <p className="text-xs text-zinc-500">Nenhuma mensagem ainda.</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="p-4 border-t border-white/10 bg-[#050816]">
+        <p className="text-[10px] text-zinc-400 mb-2">Responder WhatsApp</p>
+
+        <div className="flex gap-2">
+          <input
+            className="flex-1 bg-[#0b1023] border border-white/10 rounded-xl p-3 text-xs"
+            placeholder="Digite uma resposta..."
+            value={replyMessage[conversation.phone] || ""}
+            onChange={(e) =>
+              setReplyMessage((prev) => ({
+                ...prev,
+                [conversation.phone]: e.target.value
+              }))
+            }
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                sendManualMessage(conversation.phone);
+              }
+            }}
+          />
+
+          <button
+            onClick={() => sendManualMessage(conversation.phone)}
+            className="bg-blue-500/20 text-blue-300 px-4 rounded-xl text-xs font-bold"
+          >
+            Enviar
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
