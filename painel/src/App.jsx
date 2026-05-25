@@ -1083,12 +1083,12 @@ async function stopRecording(phone) {
       });
 
       const audioFile = new File(
-        [audioBlob],
-        "audio.webm",
-        {
-          type: "audio/webm"
-        }
-      );
+  [audioBlob],
+  "audio.webm",
+  {
+    type: "application/octet-stream"
+  }
+);
 
       const formData = new FormData();
 
