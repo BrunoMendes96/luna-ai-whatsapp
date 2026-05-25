@@ -1079,14 +1079,14 @@ async function stopRecording(phone) {
 
     recorder.onstop = async () => {
       const audioBlob = new Blob(audioChunksRef.current, {
-        type: "audio/webm"
+        type: "audio/ogg"
       });
 
       const audioFile = new File(
         [audioBlob],
-        "audio.webm",
+        "audio.ogg",
         {
-          type: "audio/webm"
+          type: "audio/ogg"
         }
       );
 
@@ -1410,6 +1410,7 @@ async function handleFileUpload(event, phone) {
 >
   Enviar
 </button>
+
         </div>
       </div>
     </div>
