@@ -1046,6 +1046,80 @@ function LeadPanel({
   const isOnline = Boolean(onlineUsers[conversation.phone]);
   const admin = isAdmin(currentUser);
 
+const mediaRecorderRef = useRef(null);
+const audioChunksRef = useRef([]);
+
+async function startRecording() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: true
+    });
+
+    const mediaRecorder = new MediaRecorder(stream);
+
+    mediaRecorderRef.current = mediaRecorder;
+    audioChunksRef.current = [];
+
+    mediaRecorder.ondataavailable = (event) => {
+      audioChunksRef.current.push(event.data);
+    };
+
+    mediaRecorder.start();
+  } catch (error) {
+    console.error(error);
+    alert("Erro ao acessar microfone");
+  }
+}
+
+async function stopRecording(phone) {
+  try {
+    const recorder = mediaRecorderRef.current;
+
+    if (!recorder) return;
+
+    recorder.onstop = async () => {
+      const audioBlob = new Blob(audioChunksRef.current, {
+        type: "audio/webm"
+      });
+
+      const audioFile = new File(
+        [audioBlob],
+        "audio.webm",
+        {
+          type: "audio/webm"
+        }
+      );
+
+      const formData = new FormData();
+
+      formData.append("file", audioFile);
+      formData.append("phone", phone);
+
+      const response = await fetch(
+        `${API_URL}/api/send-media`,
+        {
+          method: "POST",
+          body: formData
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(data.error || "Erro ao enviar áudio");
+        return;
+      }
+
+      alert("Áudio enviado");
+    };
+
+    recorder.stop();
+  } catch (error) {
+    console.error(error);
+    alert("Erro ao gravar áudio");
+  }
+}
+
 async function handleFileUpload(event, phone) {
   try {
     const file = event.target.files?.[0];
@@ -1296,6 +1370,15 @@ async function handleFileUpload(event, phone) {
 
       <div className="p-4 border-t border-white/10 bg-[#050816]">
         <p className="text-[10px] text-zinc-400 mb-2">Responder WhatsApp</p>
+        <div className="flex gap-2 mt-2">
+  <button
+    onMouseDown={startRecording}
+    onMouseUp={() => stopRecording(conversation.phone)}
+    className="bg-red-500/20 border border-red-500/20 text-red-300 px-4 rounded-xl text-xs font-bold"
+  >
+    🎤 Segurar para gravar
+  </button>
+</div>
 
         <div className="mb-3">
           <input
@@ -1322,11 +1405,11 @@ async function handleFileUpload(event, phone) {
           />
 
           <button
-            onClick={() => sendManualMessage(conversation.phone)}
-            className="bg-blue-500/20 text-blue-300 px-4 rounded-xl text-xs font-bold"
-          >
-            Enviar
-          </button>
+  onClick={() => sendManualMessage(conversation.phone)}
+  className="bg-blue-500/20 text-blue-300 px-4 rounded-xl text-xs font-bold"
+>
+  Enviar
+</button>
         </div>
       </div>
     </div>
