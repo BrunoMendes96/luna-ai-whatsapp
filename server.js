@@ -1,4 +1,8 @@
 import express from "express";
+import ffmpeg from "fluent-ffmpeg";
+import ffmpegPath from "ffmpeg-static";
+
+ffmpeg.setFfmpegPath(ffmpegPath);
 import fs from "fs";
 import FormData from "form-data";
 import multer from "multer";
@@ -998,8 +1002,8 @@ app.post("/webhook", async (req, res) => {
     await saveMessage(from, "user", userText, {
       type: messageType,
       media_url: mediaUrl,
-      media_mime_type: mediaMimeType,
-      media_filename: mediaFilename,
+      media_mime_type: finalMime,
+      media_filename: finalName,
       profile_name: profileName,
       assignedAgent
     });
@@ -1257,6 +1261,27 @@ app.post(
         });
       }
 
+let finalPath = file.path;
+let finalMime = file.mimetype;
+let finalName = file.originalname;
+
+if (file.mimetype.includes("webm")) {
+  const outputPath = `${file.path}.ogg`;
+
+  await new Promise((resolve, reject) => {
+    ffmpeg(file.path)
+      .audioCodec("libopus")
+      .format("ogg")
+      .save(outputPath)
+      .on("end", resolve)
+      .on("error", reject);
+  });
+
+  finalPath = outputPath;
+  finalMime = "audio/ogg";
+  finalName = "audio.ogg";
+}
+
       const formData = new FormData();
 
       formData.append(
@@ -1266,10 +1291,10 @@ app.post(
 
       formData.append(
         "file",
-        fs.createReadStream(file.path),
+        fs.createReadStream(finalPath),
         {
-          filename: file.originalname,
-          contentType: file.mimetype
+          filename: finalName,
+          contentType: finalMime
         }
       );
 
@@ -1348,7 +1373,8 @@ app.post(
         }
       );
 
-      fs.unlinkSync(file.path);
+      if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
+if (finalPath !== file.path && fs.existsSync(finalPath)) fs.unlinkSync(finalPath);
 
       res.json({
         success: true
