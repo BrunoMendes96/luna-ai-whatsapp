@@ -1265,7 +1265,11 @@ let finalPath = file.path;
 let finalMime = file.mimetype;
 let finalName = file.originalname;
 
-if (file.mimetype.includes("webm")) {
+if (
+  file.mimetype.includes("webm") ||
+  file.originalname.toLowerCase().endsWith(".webm") ||
+  file.mimetype === "application/octet-stream"
+) {
   const outputPath = `${file.path}.ogg`;
 
   await new Promise((resolve, reject) => {

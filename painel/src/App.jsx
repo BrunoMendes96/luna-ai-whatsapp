@@ -1078,15 +1078,15 @@ async function stopRecording(phone) {
     if (!recorder) return;
 
     recorder.onstop = async () => {
-      const audioBlob = new Blob(audioChunksRef.current, {
-        type: "audio/ogg"
-      });
+     const audioBlob = new Blob(audioChunksRef.current, {
+  type: "audio/webm"
+});
 
-      const audioFile = new File(
+const audioFile = new File(
   [audioBlob],
-  "audio.ogg",
+  "audio.webm",
   {
-    type: "application/octet-stream"
+    type: "audio/webm"
   }
 );
 
