@@ -1278,7 +1278,10 @@ if (
       .format("ogg")
       .save(outputPath)
       .on("end", resolve)
-      .on("error", reject);
+      .on("error", (err) => {
+  console.error("FFMPEG ERROR:", err.message);
+  reject(err);
+});
   });
 
   finalPath = outputPath;
