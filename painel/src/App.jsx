@@ -1377,7 +1377,7 @@ async function handleFileUpload(event, phone) {
     onMouseUp={() => stopRecording(conversation.phone)}
     className="bg-red-500/20 border border-red-500/20 text-red-300 px-4 rounded-xl text-xs font-bold"
   >
-    🎤 Segurar para gravar
+     🎤 Gravar 3s e enviar
   </button>
 </div>
 
