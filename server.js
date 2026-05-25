@@ -1254,6 +1254,11 @@ app.post(
     try {
       const { phone } = req.body;
       const file = req.file;
+      console.log("UPLOAD RECEBIDO:", {
+  originalname: file?.originalname,
+  mimetype: file?.mimetype,
+  path: file?.path
+});
 
       if (!phone || !file) {
         return res.status(400).json({

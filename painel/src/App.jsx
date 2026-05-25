@@ -1111,6 +1111,7 @@ const audioFile = new File(
       }
 
       alert("Áudio enviado");
+console.log("AUDIO SEND OK");
     };
 
     recorder.stop();
