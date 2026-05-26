@@ -1335,13 +1335,9 @@ if (
         type = "image";
       }
 
-      if (
-        file.mimetype.startsWith(
-          "audio/"
-        )
-      ) {
-        type = "audio";
-      }
+      if (finalMime.startsWith("audio/")) {
+  type = "audio";
+}
 
       if (
         file.mimetype.startsWith(
@@ -1350,6 +1346,14 @@ if (
       ) {
         type = "video";
       }
+
+if (
+  finalMime.startsWith(
+    "audio/"
+  )
+) {
+  type = "audio";
+}
 
       await axios.post(
         `https://graph.facebook.com/v20.0/${process.env.PHONE_NUMBER_ID}/messages`,
@@ -1371,19 +1375,19 @@ if (
         }
       );
 
-      await saveMessage(
-        phone,
-        "assistant",
-        `Arquivo enviado: ${file.originalname}`,
-        {
-          type,
-          media_url: mediaId,
-          media_mime_type:
-            file.mimetype,
-          media_filename:
-            file.originalname
-        }
-      );
+     await saveMessage(
+  phone,
+  "assistant",
+  `Arquivo enviado: ${finalName}`,
+  {
+    type,
+    media_url: mediaId,
+    media_mime_type:
+      finalMime,
+    media_filename:
+      finalName
+  }
+);
 
       if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
 if (finalPath !== file.path && fs.existsSync(finalPath)) fs.unlinkSync(finalPath);
