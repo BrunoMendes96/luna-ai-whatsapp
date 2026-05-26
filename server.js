@@ -1279,9 +1279,14 @@ if (
 
   await new Promise((resolve, reject) => {
     ffmpeg(file.path)
-      .audioCodec("libopus")
-      .format("ogg")
-      .save(outputPath)
+  .noVideo()
+  .audioCodec("libopus")
+  .audioChannels(1)
+  .audioFrequency(48000)
+  .audioBitrate("32k")
+  .format("ogg")
+  .outputOptions(["-application voip"])
+  .save(outputPath)
       .on("end", resolve)
       .on("error", (err) => {
   console.error("FFMPEG ERROR:", err.message);
@@ -1352,7 +1357,7 @@ if (
     "audio/"
   )
 ) {
-  type = "document";
+  type = "audio";
 }
 
       await axios.post(
