@@ -1046,25 +1046,30 @@ function LeadPanel({
   const isOnline = Boolean(onlineUsers[conversation.phone]);
   const admin = isAdmin(currentUser);
 
+const [isRecording, setIsRecording] = useState(false);
+
 const mediaRecorderRef = useRef(null);
 const audioChunksRef = useRef([]);
 
 async function startRecording() {
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: true
-    });
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-    const mediaRecorder = new MediaRecorder(stream);
+    const mediaRecorder = new MediaRecorder(stream, {
+      mimeType: "audio/webm"
+    });
 
     mediaRecorderRef.current = mediaRecorder;
     audioChunksRef.current = [];
 
     mediaRecorder.ondataavailable = (event) => {
-      audioChunksRef.current.push(event.data);
+      if (event.data && event.data.size > 0) {
+        audioChunksRef.current.push(event.data);
+      }
     };
 
-    mediaRecorder.start();
+    mediaRecorder.start(1000);
+    setIsRecording(true);
   } catch (error) {
     console.error(error);
     alert("Erro ao acessar microfone");
@@ -1075,48 +1080,55 @@ async function stopRecording(phone) {
   try {
     const recorder = mediaRecorderRef.current;
 
-    if (!recorder) return;
+    if (!recorder || recorder.state !== "recording") return;
 
     recorder.onstop = async () => {
-     const audioBlob = new Blob(audioChunksRef.current, {
+      const audioBlob = new Blob(audioChunksRef.current, {
+        type: "audio/webm"
+      });
+
+      if (audioBlob.size < 5000) {
+        alert("Áudio muito curto. Grave por mais tempo.");
+        setIsRecording(false);
+        return;
+      }
+
+const audioFile = new File([audioBlob], "audio.webm", {
   type: "audio/webm"
 });
 
-const audioFile = new File(
-  [audioBlob],
-  "audio.webm",
-  {
-    type: "audio/webm"
-  }
-);
-
       const formData = new FormData();
-
       formData.append("file", audioFile);
       formData.append("phone", phone);
 
-      const response = await fetch(
-        `${API_URL}/api/send-media`,
-        {
-          method: "POST",
-          body: formData
-        }
-      );
+      const response = await fetch(`${API_URL}/api/send-media`, {
+        method: "POST",
+        body: formData
+      });
 
       const data = await response.json();
 
       if (!response.ok) {
         alert(data.error || "Erro ao enviar áudio");
+        setIsRecording(false);
         return;
       }
 
       alert("Áudio enviado");
-console.log("AUDIO SEND OK");
+      setIsRecording(false);
+      audioChunksRef.current = [];
+
+      recorder.stream.getTracks().forEach((track) => track.stop());
     };
 
-    recorder.stop();
+    recorder.requestData();
+
+    setTimeout(() => {
+      recorder.stop();
+    }, 300);
   } catch (error) {
     console.error(error);
+    setIsRecording(false);
     alert("Erro ao gravar áudio");
   }
 }
@@ -1373,12 +1385,21 @@ async function handleFileUpload(event, phone) {
         <p className="text-[10px] text-zinc-400 mb-2">Responder WhatsApp</p>
         <div className="flex gap-2 mt-2">
   <button
-    onMouseDown={startRecording}
-    onMouseUp={() => stopRecording(conversation.phone)}
-    className="bg-red-500/20 border border-red-500/20 text-red-300 px-4 rounded-xl text-xs font-bold"
-  >
-     🎤 Gravar 3s e enviar
-  </button>
+  onClick={() => {
+    if (isRecording) {
+      stopRecording(conversation.phone);
+    } else {
+      startRecording();
+    }
+  }}
+  className={`border px-4 py-2 rounded-xl text-xs font-bold ${
+    isRecording
+      ? "bg-red-500 text-white border-red-400 animate-pulse"
+      : "bg-red-500/20 border-red-500/20 text-red-300"
+  }`}
+>
+  {isRecording ? "⏹ Parar e enviar" : "🎤 Gravar áudio"}
+</button>
 </div>
 
         <div className="mb-3">
