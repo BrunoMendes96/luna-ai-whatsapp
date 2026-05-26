@@ -1352,7 +1352,7 @@ if (
     "audio/"
   )
 ) {
-  type = "audio";
+  type = "document";
 }
 
       await axios.post(
@@ -1362,9 +1362,14 @@ if (
             "whatsapp",
           to: phone,
           type,
-          [type]: {
-            id: mediaId
-          }
+          [type]: type === "document"
+  ? {
+      id: mediaId,
+      filename: finalName
+    }
+  : {
+      id: mediaId
+    }
         },
         {
           headers: {
