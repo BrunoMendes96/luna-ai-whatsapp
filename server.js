@@ -1278,25 +1278,30 @@ if (
   const outputPath = `${file.path}.ogg`;
 
   await new Promise((resolve, reject) => {
-    ffmpeg(file.path)
-  .noVideo()
-  .audioCodec("libopus")
-  .audioChannels(1)
-  .audioFrequency(48000)
-  .audioBitrate("32k")
-  .format("ogg")
-  .outputOptions(["-application voip"])
-  .save(outputPath)
-      .on("end", resolve)
-      .on("error", (err) => {
-  console.error("FFMPEG ERROR:", err.message);
-  reject(err);
+  ffmpeg(file.path)
+    .inputFormat("webm")
+    .noVideo()
+    .audioCodec("libopus")
+    .audioChannels(1)
+    .audioFrequency(48000)
+    .audioBitrate("32k")
+    .format("ogg")
+    .outputOptions([
+      "-application voip",
+      "-frame_duration 20"
+    ])
+    .on("end", resolve)
+    .on("error", (err) => {
+      console.error("FFMPEG ERROR:", err.message);
+      reject(err);
+    })
+    .save(outputPath);
 });
-  });
 
   finalPath = outputPath;
   finalMime = "audio/ogg";
   finalName = "audio.ogg";
+  type = "audio";
 }
 
       const formData = new FormData();
