@@ -1336,6 +1336,17 @@ if (
         uploadResponse.data.id;
 
       let type = "document";
+      if (file.mimetype.startsWith("image/")) {
+  type = "image";
+}
+
+if (file.mimetype.startsWith("video/")) {
+  type = "video";
+}
+
+if (finalMime.startsWith("audio/")) {
+  type = "audio";
+}
 
       if (
         file.mimetype.startsWith(
