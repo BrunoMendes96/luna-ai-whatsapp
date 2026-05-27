@@ -1002,8 +1002,8 @@ app.post("/webhook", async (req, res) => {
     await saveMessage(from, "user", userText, {
       type: messageType,
       media_url: mediaUrl,
-      media_mime_type: finalMime,
-      media_filename: finalName,
+      media_mime_type: mediaMimeType,
+      media_filename: mediaFilename,
       profile_name: profileName,
       assignedAgent
     });
@@ -1301,7 +1301,7 @@ if (
   finalPath = outputPath;
   finalMime = "audio/ogg";
   finalName = "audio.ogg";
-  type = "audio";
+
 }
 
       const formData = new FormData();
@@ -1335,8 +1335,9 @@ if (
       const mediaId =
         uploadResponse.data.id;
 
-      let type = "document";
-      if (file.mimetype.startsWith("image/")) {
+let type = "document";
+
+if (file.mimetype.startsWith("image/")) {
   type = "image";
 }
 
@@ -1348,33 +1349,7 @@ if (finalMime.startsWith("audio/")) {
   type = "audio";
 }
 
-      if (
-        file.mimetype.startsWith(
-          "image/"
-        )
-      ) {
-        type = "image";
-      }
 
-      if (finalMime.startsWith("audio/")) {
-  type = "audio";
-}
-
-      if (
-        file.mimetype.startsWith(
-          "video/"
-        )
-      ) {
-        type = "video";
-      }
-
-if (
-  finalMime.startsWith(
-    "audio/"
-  )
-) {
-  type = "audio";
-}
 
       await axios.post(
         `https://graph.facebook.com/v20.0/${process.env.PHONE_NUMBER_ID}/messages`,
