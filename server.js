@@ -1287,9 +1287,10 @@ if (
     .audioBitrate("32k")
     .format("ogg")
     .outputOptions([
-      "-application voip",
-      "-frame_duration 20"
-    ])
+  "-application", "voip",
+  "-frame_duration", "20",
+  "-vn"
+])
     .on("end", resolve)
     .on("error", (err) => {
       console.error("FFMPEG ERROR:", err.message);
